@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "PhantomGo (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "PhantomGo (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
