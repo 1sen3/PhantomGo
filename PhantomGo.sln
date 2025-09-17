@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhantomGo.Core", "PhantomGo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhantomGo.ConsoleApp", "PhantomGo.ConsoleApp\PhantomGo.ConsoleApp.csproj", "{A4E65491-0633-4AE4-A721-061246FF5114}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhantomGo.AI", "PhantomGo.AI\PhantomGo.AI.csproj", "{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -61,6 +63,18 @@ Global
 		{A4E65491-0633-4AE4-A721-061246FF5114}.Release|x64.Build.0 = Release|Any CPU
 		{A4E65491-0633-4AE4-A721-061246FF5114}.Release|x86.ActiveCfg = Release|Any CPU
 		{A4E65491-0633-4AE4-A721-061246FF5114}.Release|x86.Build.0 = Release|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Debug|x64.Build.0 = Debug|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Debug|x86.Build.0 = Debug|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Release|ARM64.Build.0 = Release|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Release|x64.ActiveCfg = Release|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Release|x64.Build.0 = Release|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Release|x86.ActiveCfg = Release|Any CPU
+		{B91F5A32-DBD5-4421-ACE2-24FA90705D5A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

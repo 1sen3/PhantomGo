@@ -16,9 +16,9 @@ namespace PhantomGo.Core.Logic
         private readonly PointState[,] _board;
         private Point? _koPoint; // 禁着点
         public int Size { get; private set; }
-        public GoBoard()
+        public GoBoard(int size = 9)
         {
-            Size = 9;
+            Size = size;
             _board = new PointState[Size + 1, Size + 1];
         }
         /// <summary>
@@ -36,24 +36,13 @@ namespace PhantomGo.Core.Logic
         /// <returns>落子结果</returns>
         public PlayResult PlaceStone(Point point, Player player)
         {
-            // 检查坐标是否在棋盘内
-            if(!IsOnBoard(point))
+            // 检查坐标是否在棋盘内、是否为无子状态、是否落在劫争禁着点内
+            if (!IsOnBoard(point) || GetPointState(point) != PointState.None || _koPoint.HasValue && point.Equals(_koPoint.Value))
             {
-                return PlayResult.Failure(PlayResult.MoveError.PointOutOfBounds, $"坐标 {point} 超出棋盘边界");
-            }
-            // 检查坐标是否为无子状态
-            if(GetPointState(point) != PointState.None)
-            {
-                return PlayResult.Failure(PlayResult.MoveError.PointIsOccupied, $"坐标 {point} 已经有棋子了");
+                return PlayResult.Failure("该落子位置不合法");
             }
 
-            // 检查是否落在劫争禁着点内
-            if(_koPoint.HasValue && point.Equals(_koPoint.Value))
-            {
-                return PlayResult.Failure(PlayResult.MoveError.KoViolation, $"坐标 {point} 为禁着点");
-            }
-
-            // 没有落在禁着点内，下一手可以重置禁着点信息了
+            // 没有落在禁着点内，下一手重置禁着点信息
             _koPoint = null;
             // 尝试落子
             var stoneColor = PlayerToPointState(player); // 获取当前执棋者颜色
@@ -88,14 +77,35 @@ namespace PhantomGo.Core.Logic
             if(capturedStones.Count == 0 && newLiberties == 0)
             {
                 _board[point.X, point.Y] = PointState.None; // 撤销落子
-                return PlayResult.Failure(PlayResult.MoveError.Suicide, $"坐标 {point} 为自杀点");
+                return PlayResult.Failure("该落子位置不合法");
             }
 
             // 移动有效
-            return PlayResult.Success(capturedStones.Distinct().ToList(), "落子成功");
+            return PlayResult.Success(capturedStones.Distinct().ToList(), String.Empty);
         }
 
         #region 辅助方法
+        /// <summary>
+        /// 检查一个落子是否合法（不修改当前棋盘状态）
+        /// </summary>
+        /// <param name="point">落子点</param>
+        /// <param name="player">下棋的玩家</param>
+        /// <returns>如果合法返回 true，否则返回 false</returns>
+        public bool IsValidMove(Point point, Player player)
+        {
+            GoBoard tempBoard = this.Clone();
+            return tempBoard.PlaceStone(point, player).IsSuccess;
+        }
+        /// <summary>
+        /// 创建当前棋盘对象的副本
+        /// </summary>
+        public GoBoard Clone()
+        {
+            var newBoard = new GoBoard(this.Size);
+            Array.Copy(this._board, newBoard._board, this._board.Length);
+            newBoard._koPoint = this._koPoint;
+            return newBoard;
+        }
         /// <summary>
         /// 检查一个坐标是否在棋盘内
         /// </summary>
@@ -109,11 +119,11 @@ namespace PhantomGo.Core.Logic
         /// </summary>
         /// <param name="point"></param>
         /// <returns></returns>
-        private IEnumerable<Point> GetNeighbors(Point point)
+        public IEnumerable<Point> GetNeighbors(Point point)
         {
-            if (point.X > 1) yield return new Point(point.X - 1, point.Y);  
-            if (point.X < Size) yield return new Point(point.X + 1, point.Y);
-            if (point.Y > 1) yield return new Point(point.X, point.Y - 1);
+            if(point.X > 1) yield return new Point(point.X - 1, point.Y);  
+            if(point.X < Size) yield return new Point(point.X + 1, point.Y);
+            if(point.Y > 1) yield return new Point(point.X, point.Y - 1);
             if(point.Y < Size) yield return new Point(point.X, point.Y + 1);
         }
         /// <summary>
@@ -122,7 +132,8 @@ namespace PhantomGo.Core.Logic
         /// <returns>一个元组，包含棋子群的所有点和一个整数表示气的数量</returns>
         private (HashSet<Point> group, int liberties) FindGroup(Point startPoint)
         {
-            var state = GetPointState(startPoint); // 获取起点状态，如果无子，直接返回
+            // 获取起点状态，如果无子，直接返回
+            var state = GetPointState(startPoint); 
             if(state == PointState.None)
             {
                 return (new HashSet<Point>(), 0);
@@ -166,7 +177,7 @@ namespace PhantomGo.Core.Logic
             }
         }
         /// <summary>
-        /// 从棋盘上恢复棋子群，用于回滚
+        /// 从棋盘上恢复棋子群
         /// </summary>
         private void AddGroup(IEnumerable<Point> group, Player player)
         {

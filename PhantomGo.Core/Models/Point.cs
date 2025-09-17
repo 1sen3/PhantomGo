@@ -52,7 +52,27 @@ namespace PhantomGo.Core.Models
 
         public override string ToString()
         {
-            return $"({X}, {Y})";
+            char symbol = (char)('A' + X - 1);
+            return $"{symbol}{Y}";
+        }
+        /// <summary>
+        /// 将棋局上的坐标 (A1) 转换为坐标点 (x, y)
+        /// </summary>
+        public static Point TransInputToPoint(string input)
+        {
+            if(string.IsNullOrEmpty(input) || input.Length != 2)
+            {
+                throw new ArgumentException("输入格式错误");
+            }
+            input = input.ToUpper();
+            char symbol = input[0];
+            int x = symbol - 'A' + 1;
+            int y = int.Parse(input.Substring(1));
+            return new Point(x, y);
+        }
+        public bool isMove()
+        {
+            return !(this.Equals(new Point(0, 0)) || this.Equals(new Point(0, 1)) || this.Equals(new Point(0, 2)));
         }
     }
 }
