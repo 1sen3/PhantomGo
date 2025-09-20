@@ -8,7 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PhantomGo.AI\PhantomGo.AI.csproj" />
     <ProjectReference Include="..\PhantomGo.Core\PhantomGo.Core.csproj" />
   </ItemGroup>
 

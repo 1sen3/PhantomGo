@@ -19,17 +19,44 @@ namespace PhantomGo.Core.Agents
         /// </summary>
         PlayerKnowledge Knowledge { get; }
         /// <summary>
+        /// 玩家的棋子颜色
+        /// </summary>
+        Player PlayerColor { get; }
+        /// <summary>
         /// 生成一个落子点
         /// </summary>
         /// <param name="gameView">当前玩家的棋局视图</param>
         /// <returns>决策出的落子点</returns>
         Point GenerateMove(IGameView gameView, PlayerKnowledge knowledge);
         /// <summary>
-        /// 根据裁判返回的信息，更新记忆
+        /// 根据裁判返回的信息，更新记忆（新版）
         /// </summary>
-        /// <param name="point"></param>
-        /// <param name="result"></param>
-        void UpdateKnowledge(Point point, PlayResult result);
+        /// <param name="player">落子的玩家颜色</param>
+        /// <param name="move">落子位置</param>
+        /// <param name="result">完整的落子信息（是否成功、提子点等）</param>
+        public void ReceiveRefereeUpdate(Player player, Point move, PlayResult result)
+        {
+            // 对自己的落子的反馈
+            if (player == this.PlayerColor)
+            {
+                if (result.IsSuccess)
+                {
+                    Knowledge.AddOwnState(move);
+                }
+                else
+                {
+                    Knowledge.MarkAsInferred(move);
+                }
+            }
+            // 处理公开的提子信息
+            if (result.CapturedPoints.Count > 0)
+            {
+                foreach (var point in result.CapturedPoints)
+                {
+                    Knowledge.RemoveState(point);
+                }
+            }
+        }
         /// <summary>
         /// 根据历史记录重建记忆
         /// </summary>

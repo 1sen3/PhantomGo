@@ -2,7 +2,6 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
-using PhantomGo.AI;
 using PhantomGo.Core.Agents;
 using PhantomGo.Core.Helper;
 using PhantomGo.Core.Logic;
@@ -24,31 +23,36 @@ namespace PhantomGo.ConsoleApp
             string gameDateTimeAndLocation = $"{DateTime.Now:yyyy.MM.dd HH:mm} 本地";
             string eventName = "测试赛";
 
-            IPlayerAgent aiPlayer = new RandomPlayer(game.BoardSize);
-            IPlayerAgent humanPlayer = new RandomPlayer(game.BoardSize);
+            IPlayerAgent blackPlayer = new SimpleAgentPlayer(game.BoardSize, Player.Black);
+            IPlayerAgent whitePlayer = new SimpleAgentPlayer(game.BoardSize, Player.White);
+            
             // 决定谁执黑执白
             var playerAgents = new Dictionary<Player, IPlayerAgent>
             {
-                { Player.Black, humanPlayer },
-                { Player.White, aiPlayer },
+                { Player.Black, blackPlayer },
+                { Player.White, whitePlayer },
             };
             var knowledgeBases = new Dictionary<Player, PlayerKnowledge>
             {
-                { Player.Black, humanPlayer.Knowledge },
-                { Player.White, aiPlayer.Knowledge },
+                { Player.Black, blackPlayer.Knowledge },
+                { Player.White, whitePlayer.Knowledge },
             };
+
             while(game.CurrentGameState == GameState.Playing)
             {
                 Console.Clear();
-                PrintAllViews(humanPlayer.Knowledge, aiPlayer.Knowledge);
+                PrintAllViews(blackPlayer.Knowledge, whitePlayer.Knowledge);
                 PrintGameStatus();
 
-                var currentPlayer = playerAgents[game.CurrentPlayer];
-                var currentKnowledge = currentPlayer.Knowledge;
+                var currentPlayer = game.CurrentPlayer;
+                var currentPlayerAgent = playerAgents[currentPlayer];
+
+                var opponentPlayer = PlayerHelper.GetOpponent(currentPlayer);
+                var opponentPlayerAgent = playerAgents[opponentPlayer];
 
                 var gameView = new PhantomGoView(game, game.CurrentPlayer);
 
-                if(currentPlayer is HumanPlayer)
+                if(currentPlayerAgent is HumanPlayer)
                 {
                     Console.WriteLine("现在轮到你落子");
                 } else
@@ -56,7 +60,7 @@ namespace PhantomGo.ConsoleApp
                     Console.WriteLine($"现在轮到 AI 落子");
                 }
 
-                Point move = currentPlayer.GenerateMove(gameView, currentKnowledge);
+                Point move = currentPlayerAgent.GenerateMove(gameView, currentPlayerAgent.Knowledge);
                 if(move.Equals(new Point(0, 0)))
                 {
                     var result = game.Pass();
@@ -103,41 +107,48 @@ namespace PhantomGo.ConsoleApp
                 } else
                 {
                     var result = game.MakeMove(move);
-                    currentPlayer.UpdateKnowledge(move, result);
+
+                    // 裁判将结果播播报给双方
+                    currentPlayerAgent.ReceiveRefereeUpdate(currentPlayer, move, result);
+                    opponentPlayerAgent.ReceiveRefereeUpdate(currentPlayer, move, result);
+
                     // 如果发生提子，更新双方记忆
                     if (result.IsSuccess && result.CapturedPoints.Count > 0)
                     {
-                        var capturedPlayer = game.CurrentPlayer;
-                        var capturedKnowledge = knowledgeBases[capturedPlayer];
-                        foreach (var point in result.CapturedPoints)
+                        if (whitePlayer is HumanPlayer || blackPlayer is HumanPlayer)
                         {
-                            capturedKnowledge.RemoveState(point);
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine($"注意：{string.Join(", ", result.CapturedPoints)} 位置的棋子被提掉了");
+                            Console.ResetColor();
+                            Console.Write("输入回车继续...");
+                            Console.ReadLine();
                         }
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"注意：{string.Join(", ", result.CapturedPoints)} 位置的棋子被提掉了");
-                        Console.ResetColor();
-                        Console.Write("输入回车继续...");
-                        Console.ReadLine();
                         continue;
                     }
-                    if (currentPlayer is HumanPlayer)
+
+                    if (result.IsSuccess)
                     {
-                        if (result.IsSuccess)
-                        {
-                            // 人类玩家的成功落子（无论是否提子）后暂停
-                            Console.ForegroundColor = ConsoleColor.Green;
-                            Console.Write("落子成功，输入回车继续...");
-                            Console.ResetColor();
-                            Console.ReadLine();
-                        }
-                        else
-                        {
-                            // 人类玩家的失败落子后暂停
-                            Console.ForegroundColor = ConsoleColor.Yellow;
-                            Console.Write($"落子失败：{result.Message}，输入回车继续...");
-                            Console.ResetColor();
-                            Console.ReadLine();
-                        }
+                        Console.Clear();
+                        PrintAllViews(blackPlayer.Knowledge, whitePlayer.Knowledge);
+                        PrintGameStatus();
+
+                        Console.WriteLine("----------");
+                        Console.WriteLine($"落子历史: {SgfGenerator.GenerateMoveSequenceTemp(game.GetMoveHistory())}");
+
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write($"在 {move} 落子成功，输入回车继续...");
+                        Console.ResetColor();
+                        Console.ReadLine();
+                    }
+                    else
+                    {
+                        Console.WriteLine("----------");
+                        Console.WriteLine($"落子历史: {SgfGenerator.GenerateMoveSequenceTemp(game.GetMoveHistory())}");
+
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.Write($"落子点 {move} 不合法，输入回车继续...");
+                        Console.ResetColor();
+                        Console.ReadLine();
                     }
                 }
             }

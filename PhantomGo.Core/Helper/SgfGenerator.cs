@@ -68,6 +68,16 @@ namespace PhantomGo.Core.Helper
             });
             return string.Join(";", moveStrings);
         }
+        public static string GenerateMoveSequenceTemp(List<MoveRecord> moveHistory)
+        {
+            var moveStrings = moveHistory.Where(record => record.point.isMove()).Select(record =>
+            {
+                char player = record.player == Player.Black ? 'B' : 'W';
+                string pointStr = record.point.ToString();
+                return $"{player}[{pointStr}]";
+            });
+            return string.Join(";", moveStrings);
+        }
         /// <summary>
         /// 生成棋谱内容
         /// </summary>

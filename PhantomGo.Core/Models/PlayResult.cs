@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -50,6 +52,28 @@ namespace PhantomGo.Core.Models
         public static PlayResult Failure(string message)
         {
             return new PlayResult(false, Array.Empty<Point>(), message);
+        }
+        public static PlayResult InputResult()
+        {
+            var capturedPoint = new List<Point>();
+            Console.Write("该落子是否合法 (y/n)：");
+            string c = Console.ReadLine().ToLower();
+            if (!string.IsNullOrEmpty(c) && c == "y")
+            {
+                Console.WriteLine("请输入被提子的坐标，格式如 A1 B2 C3，若无则直接回车：");
+                string capturedStr = Console.ReadLine().Trim();
+                if (!string.IsNullOrEmpty(capturedStr))
+                {
+                    var parts = capturedStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var part in parts)
+                    {
+                        var point = Point.TransInputToPoint(part);
+                        capturedPoint.Add(point);
+                    }
+                }
+                return PlayResult.Success(capturedPoint, "落子成功");
+            }
+            return PlayResult.Failure("该落子不合法");
         }
     }
 }

@@ -74,5 +74,18 @@ namespace PhantomGo.Core.Models
         {
             return !(this.Equals(new Point(0, 0)) || this.Equals(new Point(0, 1)) || this.Equals(new Point(0, 2)));
         }
+        public static Point Pass()
+        {
+            return new Point(0, 0);
+        }
+        public static Point Undo()
+        {
+            return new Point(0, 1);
+        }
+
+        public static Point Quit()
+        {
+            return new Point(0, 2);
+        }
     }
 }

@@ -4,14 +4,16 @@ using PhantomGo.Core.Logic;
 using PhantomGo.Core.Models;
 using PhantomGo.Core.Views;
 
-namespace PhantomGo.AI
+namespace PhantomGo.Core.Agents
 {
     public class RandomPlayer : IPlayerAgent
     {
         public PlayerKnowledge Knowledge { get; }
-        public RandomPlayer(int boardSize)
+        public Player PlayerColor { get; }
+        public RandomPlayer(int boardSize, Player playerColor)
         {
             Knowledge = new PlayerKnowledge(boardSize);
+            PlayerColor = playerColor;
         }
         private readonly Random _random = new Random();
         public Point GenerateMove(IGameView gameView, PlayerKnowledge knowledge)
@@ -37,16 +39,6 @@ namespace PhantomGo.AI
             {
                 // pass
                 return new Point(0, 0);
-            }
-        }
-        public void UpdateKnowledge(Point point, PlayResult result)
-        {
-            if(result.IsSuccess)
-            {
-                Knowledge.AddOwnState(point);
-            } else
-            {
-                Knowledge.MarkAsInferred(point);
             }
         }
     }

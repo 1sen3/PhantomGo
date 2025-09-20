@@ -1,21 +1,26 @@
+using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Brushes;
+using Microsoft.Graphics.Canvas.Text;
+using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Dispatching;
-using Microsoft.Graphics.Canvas.UI.Xaml;
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.Brushes;
-using System.Numerics;
-using System;
-using System.Threading.Tasks;
-
-// 引入你的项目命名空间
+using PhantomGo.Core.Agents;
+using PhantomGo.Core.Helper;
 using PhantomGo.Core.Logic;
 using PhantomGo.Core.Models;
-using PhantomGo.Core.Agents;
-using PhantomGo.AI; // 假设 RandomPlayer 在这里
+using PhantomGo.Core.Views;
+using System;
+using System.Diagnostics;
+using System.Numerics;
+using System.Text;
+using System.Threading.Tasks;
+using Windows.UI;
+
 
 namespace PhantomGo
 {
@@ -25,27 +30,45 @@ namespace PhantomGo
         private readonly IPlayerAgent _aiPlayer;
         private bool _isAiThinking = false;
 
-        // 布局参数
-        private const double BoardMargin = 0;
         private float _gridSpacing;
         private float _stoneRadius;
         private float _canvasRenderSize;
 
+        // 为坐标标签定义的边距和字体格式
+        private const float LabelMargin = 30;
+        private CanvasTextFormat _labelTextFormat;
+
         public MainWindow()
         {
             this.InitializeComponent();
-            this.Title = "PhantomGo on WinUI3";
+            ExtendsContentIntoTitleBar = true;
+            AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
+            AppWindow.Resize(new Windows.Graphics.SizeInt32(2055, 1497));
 
-            _aiPlayer = new RandomPlayer(); // 初始化AI
+            BoardSegmented.SelectedItem = RefereeSegment;
+            StatusSegmented.SelectedItem = GameStatusSegment;
+
+            _labelTextFormat = new CanvasTextFormat()
+            {
+                FontSize = 14,
+                HorizontalAlignment = CanvasHorizontalAlignment.Center,
+                VerticalAlignment = CanvasVerticalAlignment.Center
+            };
+
+            _aiPlayer = new SimpleAgentPlayer(9, Player.White);
             StartNewGame();
         }
 
         private void StartNewGame()
         {
+            if (_gameController != null)
+            {
+                _gameController.EndGame();
+            }
             _gameController = new GameController(9);
             _isAiThinking = false;
-            // !! 核心改动 !!
-            // 由于Canvas尺寸固定，我们只需计算一次布局
+
+            // 计算布局
             CalculateLayout();
 
             UpdateUI();
@@ -55,7 +78,6 @@ namespace PhantomGo
 
         private void GameBoardCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            // 如果是AI回合或游戏结束，则不响应点击
             if (_gameController.CurrentPlayer == Player.White ||
                 _gameController.CurrentGameState != GameState.Playing || _isAiThinking)
             {
@@ -65,18 +87,18 @@ namespace PhantomGo
             var point = e.GetCurrentPoint(GameBoardCanvas).Position;
             var logicalPoint = ScreenToLogical(new Vector2((float)point.X, (float)point.Y));
 
-            if (logicalPoint.X > 0) // ScreenToLogical 返回 (0,0) 表示无效点击
+            if (logicalPoint.X > 0)
             {
                 var result = _gameController.MakeMove(logicalPoint);
+                _aiPlayer.ReceiveRefereeUpdate(Player.Black, logicalPoint, result);
+                Debug.Print($"玩家落子: {logicalPoint}, 结果: {result.IsSuccess}, 提子: {string.Join(",", result.CapturedPoints)}");
                 if (result.IsSuccess)
                 {
                     UpdateUI();
-                    // 立即触发AI回合
                     TriggerAiMove();
                 }
                 else
                 {
-                    // 可以弹窗提示错误，这里简单地在Debug输出
                     System.Diagnostics.Debug.WriteLine($"落子失败: {result.Message}");
                 }
             }
@@ -86,7 +108,12 @@ namespace PhantomGo
         {
             if (_gameController.CurrentGameState != GameState.Playing || _isAiThinking) return;
 
-            _gameController.Pass();
+            var result = _gameController.Pass();
+            if (result.IsSuccess)
+            {
+                _aiPlayer.ReceiveRefereeUpdate(Player.Black, new Point(0, 0), result);
+            }
+
             UpdateUI();
 
             if (_gameController.CurrentPlayer == Player.White)
@@ -99,7 +126,6 @@ namespace PhantomGo
         {
             if (_isAiThinking) return;
 
-            // 悔棋会撤销AI和玩家的两步
             var result = _gameController.Undo(true);
             if (!result.IsSuccess)
             {
@@ -129,37 +155,48 @@ namespace PhantomGo
             if (_gameController.CurrentPlayer == Player.White && _gameController.CurrentGameState == GameState.Playing)
             {
                 _isAiThinking = true;
-                UpdateUI(); // 更新UI以显示AI正在思考（例如，禁用按钮）
+                UpdateUI();
 
-                // AI思考和落子
-                await Task.Delay(200); // 短暂延迟，让UI有响应感
-                var aiMove = _aiPlayer.GenerateMove(_gameController);
-                _gameController.MakeMove(aiMove);
+                var gameView = new PhantomGoView(_gameController, Player.White);
+
+                await Task.Delay(200);
+                var aiMove = _aiPlayer.GenerateMove(gameView, _aiPlayer.Knowledge);
+
+                if(aiMove == Point.Pass())
+                {
+                    var passResult = _gameController.Pass();
+                    _aiPlayer.ReceiveRefereeUpdate(Player.White, aiMove, passResult);
+                    Debug.Print($"AI选择了Pass, 结果: {passResult.IsSuccess}");
+                    _isAiThinking = false;
+                    UpdateUI();
+                    return;
+                }
+
+                var result = _gameController.MakeMove(aiMove);
+                _aiPlayer.ReceiveRefereeUpdate(Player.White, aiMove, result);
+                if (result.IsSuccess == false)
+                {
+                    TriggerAiMove();
+                }
+
+                Debug.Print($"AI落子: {aiMove}, 结果: {result.IsSuccess}, 提子: {string.Join(",", result.CapturedPoints)}");
 
                 _isAiThinking = false;
-                UpdateUI(); // AI落子后再次更新UI
+                UpdateUI();
             }
         }
 
-        /// <summary>
-        /// 核心UI更新函数
-        /// </summary>
         private void UpdateUI()
         {
-            // 更新状态文本
-            CurrentPlayerText.Text = _gameController.CurrentPlayer.ToString();
-            CurrentPlayerIndicator.Fill = new SolidColorBrush(_gameController.CurrentPlayer == Player.Black ? Colors.Black : Colors.White);
+            CurrentPlayerText.Text = _gameController.CurrentPlayer == Player.Black ? "⚫ HumanPlayer" : "⚪ AgentPlayer";
             BlackCapturesText.Text = _gameController.CapturedPointCount[Player.Black].ToString();
             WhiteCapturesText.Text = _gameController.CapturedPointCount[Player.White].ToString();
 
-            // 根据AI是否在思考来决定按钮的可用性
             PassButton.IsEnabled = !_isAiThinking;
             UndoButton.IsEnabled = !_isAiThinking;
 
-            // 请求Win2D重绘棋盘
             GameBoardCanvas.Invalidate();
 
-            // 检查游戏是否结束
             if (_gameController.CurrentGameState != GameState.Playing)
             {
                 DispatcherQueue.TryEnqueue(async () => await ShowGameOverDialog());
@@ -168,9 +205,25 @@ namespace PhantomGo
 
         private async Task ShowGameOverDialog()
         {
+            var score = _gameController.GetScoreResult();
+            StringBuilder result = new StringBuilder();
+            result.Append($"最终得分：黑方 {score.BlackScore} vs 白方 {score.WhiteScore}，");
+            if (score.BlackScore > score.WhiteScore)
+            {
+                result.Append("黑方 (先手) 胜利！");
+            }
+            else if (score.BlackScore < score.WhiteScore)
+            {
+                result.Append("白方 (后手) 胜利！");
+            }
+            else
+            {
+                result.Append("平局！");
+            }
             ContentDialog dialog = new ContentDialog
             {
                 Title = "游戏结束",
+                Content = result.ToString(),
                 CloseButtonText = "好的",
                 XamlRoot = this.Content.XamlRoot
             };
@@ -183,12 +236,17 @@ namespace PhantomGo
 
         private void CalculateLayout()
         {
-            // CanvasControl会填充Border的内部区域。
-            // Border尺寸是800x800，Padding是40，所以Canvas的尺寸是 800 - 40*2 = 720
-            _canvasRenderSize = 800 - (float)(GameBoardCard.Padding.Left + GameBoardCard.Padding.Right);
-            // 布局计算基于这个固定的渲染尺寸
-            _gridSpacing = _canvasRenderSize / (_gameController.BoardSize - 1);
-            _stoneRadius = _gridSpacing / 2 * 0.95f;
+            // [修改] canvas尺寸由Border尺寸和Padding决定 (800 - 40*2 = 720)
+            _canvasRenderSize = 720;
+
+            // [修改] 用于绘制棋盘网格的区域大小，需要减去两边的标签边距
+            float boardAreaSize = _canvasRenderSize - (2 * LabelMargin);
+
+            // [修改] 网格间距基于新的棋盘区域大小计算
+            _gridSpacing = boardAreaSize / (_gameController.BoardSize); // 注意：这里的除数改为了 BoardSize，使得线条刚好落在区域边缘
+                                                                        // 如果希望棋盘线与标签间有更大空隙，可以改回 BoardSize + 1
+
+            _stoneRadius = _gridSpacing * 0.35f; // 棋子半径略小于半格
         }
 
         private void GameBoardCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
@@ -196,22 +254,56 @@ namespace PhantomGo
             if (_gridSpacing <= 0) return;
             var ds = args.DrawingSession;
             ds.Antialiasing = CanvasAntialiasing.Antialiased;
-            // 1. 绘制棋盘线
+
+            // [修改] 棋盘网格的绘制起点偏移，现在需要考虑标签边距
+            float gridOffset = LabelMargin + (_gridSpacing / 2); // 网格线从半个格距开始
+            float boardPixelSize = _gridSpacing * (_gameController.BoardSize - 1);
+
+            // [新增] 1. 绘制坐标标签
             for (int i = 0; i < _gameController.BoardSize; i++)
             {
-                float pos = i * _gridSpacing;
-                ds.DrawLine(0, pos, _canvasRenderSize, pos, Colors.Black, 1.5f);
-                ds.DrawLine(pos, 0, pos, _canvasRenderSize, Colors.Black, 1.5f);
+                // 绘制列号 (A-I)
+                var colChar = Convert.ToChar('A' + i);
+                float xPos = gridOffset + i * _gridSpacing;
+                // 顶部
+                ds.DrawText(colChar.ToString(), xPos, LabelMargin / 2, Colors.Gray, _labelTextFormat);
+                // 底部
+                ds.DrawText(colChar.ToString(), xPos, _canvasRenderSize - LabelMargin / 2, Colors.Gray, _labelTextFormat);
+
+                // 绘制行号 (1-9)
+                var rowNum = (i + 1).ToString(); // 围棋习惯，1在下方
+                float yPos = gridOffset + i * _gridSpacing;
+                // 左侧
+                ds.DrawText(rowNum, LabelMargin / 2, yPos, Colors.Gray, _labelTextFormat);
+                // 右侧
+                ds.DrawText(rowNum, _canvasRenderSize - LabelMargin / 2, yPos, Colors.Gray, _labelTextFormat);
             }
 
-            // 2. 绘制星位 (9路棋盘通常是5个)
-            var starPoints = new[] { new Point(3, 3), new Point(7, 3), new Point(5, 5), new Point(3, 7), new Point(7, 7) };
-            foreach (var p in starPoints)
+            // [修改] 2. 绘制棋盘线 (使用新的gridOffset)
+            for (int i = 0; i < _gameController.BoardSize; i++)
             {
-                ds.FillCircle(LogicalToScreen(p), 4, Colors.Black);
+                float pos = gridOffset + i * _gridSpacing;
+                ds.DrawLine(gridOffset, pos, gridOffset + boardPixelSize, pos, Colors.Black, 1.5f); // 横线
+                ds.DrawLine(pos, gridOffset, pos, gridOffset + boardPixelSize, Colors.Black, 1.5f); // 竖线
             }
 
-            // 3. 绘制棋子
+            // [修改] 3. 绘制星位 (LogicalToScreen已更新，无需改动此处逻辑)
+            if (_gameController.BoardSize == 9)
+            {
+                // 9路棋盘星位: (3,3), (7,3), (5,5), (3,7), (7,7)
+                var starPoints = new[]
+                {
+                    new Point(3, 3), new Point(7, 3),
+                    new Point(5, 5),
+                    new Point(3, 7), new Point(7, 7)
+                };
+                foreach (var p in starPoints)
+                {
+                    ds.FillCircle(LogicalToScreen(p), 4, Colors.Black);
+                }
+            }
+
+            // [修改] 4. 绘制棋子 (LogicalToScreen已更新，无需改动此处逻辑)
             for (int x = 1; x <= _gameController.BoardSize; x++)
             {
                 for (int y = 1; y <= _gameController.BoardSize; y++)
@@ -229,28 +321,51 @@ namespace PhantomGo
             }
         }
 
-        // 将棋盘逻辑坐标 (1-9) 转换为屏幕像素坐标
-        // 这个方法现在也更简单了
         private Vector2 LogicalToScreen(Point logicalPoint)
         {
+            // [修改] 转换时需要加上标签边距和半格偏移
+            float gridOffset = LabelMargin + (_gridSpacing / 2);
             return new Vector2(
-                (logicalPoint.X - 1) * _gridSpacing,
-                (logicalPoint.Y - 1) * _gridSpacing
+                gridOffset + (logicalPoint.X - 1) * _gridSpacing,
+                gridOffset + (logicalPoint.Y - 1) * _gridSpacing
             );
         }
+
         private Point ScreenToLogical(Vector2 screenPoint)
         {
-            float halfGrid = _gridSpacing / 2;
-            if (screenPoint.X < -halfGrid || screenPoint.X > _canvasRenderSize + halfGrid ||
-                screenPoint.Y < -halfGrid || screenPoint.Y > _canvasRenderSize + halfGrid)
+            // [修改] 转换时需要减去标签边距和半格偏移
+            float gridOffset = LabelMargin + (_gridSpacing / 2);
+            // 检查点击是否在棋盘网格区域内
+            if (screenPoint.X < LabelMargin || screenPoint.X > _canvasRenderSize - LabelMargin ||
+                screenPoint.Y < LabelMargin || screenPoint.Y > _canvasRenderSize - LabelMargin)
             {
-                return new Point(0, 0); // 无效点击
+                return new Point(0, 0); // 点击在边距上，无效
             }
-            int x = (int)Math.Round(screenPoint.X / _gridSpacing) + 1;
-            int y = (int)Math.Round(screenPoint.Y / _gridSpacing) + 1;
+
+            int x = (int)Math.Round((screenPoint.X - gridOffset) / _gridSpacing) + 1;
+            int y = (int)Math.Round((screenPoint.Y - gridOffset) / _gridSpacing) + 1;
+
+            // 检查边界
+            if (x < 1 || x > _gameController.BoardSize || y < 1 || y > _gameController.BoardSize)
+                return new Point(0, 0);
+
             return new Point(x, y);
         }
 
         #endregion
+
+        private void StatusSegmented_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (StatusSegmented.SelectedIndex == 0)
+            {
+                GameStatusCard.Visibility = Visibility.Visible;
+                HistoryCard.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                GameStatusCard.Visibility = Visibility.Collapsed;
+                HistoryCard.Visibility = Visibility.Visible;
+            }
+        }
     }
 }

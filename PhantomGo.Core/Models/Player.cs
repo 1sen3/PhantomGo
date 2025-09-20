@@ -33,5 +33,14 @@ namespace PhantomGo.Core.Models
         {
             return player == Player.Black ? Player.White : Player.Black;
         }
+        public static bool CompareToPointState(this Player player, PointState pointState)
+        {
+            if(pointState == PointState.black && player == Player.Black ||
+               pointState == PointState.white && player == Player.White)
+            {
+                return true;
+            }
+            return false;
+        }
     }
 }

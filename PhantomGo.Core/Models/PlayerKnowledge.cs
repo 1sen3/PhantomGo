@@ -70,5 +70,30 @@ namespace PhantomGo.Core.Models
                 }
             }
         }
+        /// <summary>
+        /// 根据当前记忆，构建并返回一个最佳猜测棋盘
+        /// </summary>
+        /// <param name="currentPlayer">当前 Agent 的颜色</param>
+        /// <returns>一个代表当前局势猜测的 GoBoard 对象</returns>
+        public GoBoard GetBestGuessBoard(Player currentPlayer)
+        {
+            GoBoard guessBoard = new GoBoard(BoardSize);
+            Player opponentPlayer = currentPlayer.GetOpponent();
+            for(int x = 1;x <= BoardSize;++x)
+            {
+                for(int y = 1;y <= BoardSize;++y)
+                {
+                    var point = new Point(x, y);
+                    if(GetMemoryState(point) == MemoryPointState.Self)
+                    {
+                        guessBoard.PlaceStone(point, currentPlayer);
+                    } else if(GetMemoryState(point) == MemoryPointState.InferredOpponent)
+                    {
+                        guessBoard.PlaceStone(point, opponentPlayer);
+                    }
+                }
+            }
+            return guessBoard;
+        }
     }
 }
