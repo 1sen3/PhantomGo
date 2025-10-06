@@ -16,16 +16,16 @@ namespace PhantomGo.Core.Agents
             PlayerColor = playerColor;
         }
         private readonly Random _random = new Random();
-        public Point GenerateMove(IGameView gameView, PlayerKnowledge knowledge)
+        public Point GenerateMove()
         {
-            var boardSize = gameView.BoardSize;
+            var boardSize = Knowledge.BoardSize;
             var validMoves = new List<Point>();
             for(int x = 1;x <= boardSize;++x)
             {
                 for(int y = 1;y <= boardSize; ++y)
                 {
                     var point = new Point(x, y);
-                    if(knowledge.GetMemoryState(point) == MemoryPointState.Unknown)
+                    if(Knowledge.GetMemoryState(point) == MemoryPointState.Unknown)
                     {
                         validMoves.Add(point);
                     }

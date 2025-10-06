@@ -158,6 +158,10 @@ namespace PhantomGo.Core.Logic
             return PlayResult.Success(Array.Empty<Point>(), "悔棋成功");
         }
         #region 辅助方法
+        public GoBoard GetBoard()
+        {
+            return this._board.Clone();
+        }
         /// <summary>
         /// 获取动作历史记录
         /// </summary>

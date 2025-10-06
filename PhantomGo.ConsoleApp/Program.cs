@@ -20,7 +20,7 @@ namespace PhantomGo.ConsoleApp
             string whiteTeamName = "队2";
             // 默认设置为和棋，在游戏结束时更新
             string winnerInfo = "和棋";
-            string gameDateTimeAndLocation = $"{DateTime.Now:yyyy.MM.dd HH:mm} 本地";
+            string gameDateTimeAndLocation = $"{DateTime.Now:yyyy.MM.dd HH：mm} 本地";
             string eventName = "测试赛";
 
             IPlayerAgent blackPlayer = new SimpleAgentPlayer(game.BoardSize, Player.Black);
@@ -179,7 +179,7 @@ namespace PhantomGo.ConsoleApp
                 eventName,
                 game
             );
-            sgfGenerator.SaveSgfToFile("GameRecords"); // 将棋谱保存在项目下的 GameRecords 文件夹中
+            sgfGenerator.SaveSgfToFile(); // 将棋谱保存在项目下的 GameRecords 文件夹中
             Console.WriteLine("\n按任意键退出...");
             Console.ReadKey();
         }

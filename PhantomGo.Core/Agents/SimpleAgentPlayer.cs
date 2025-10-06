@@ -1,4 +1,4 @@
-﻿using PhantomGo.Core.Agents;
+﻿﻿using PhantomGo.Core.Agents;
 using PhantomGo.Core.Logic;
 using PhantomGo.Core.Models;
 using PhantomGo.Core.Views;
@@ -36,25 +36,38 @@ namespace PhantomGo.Core.Agents
         /// <summary>
         /// 根据评估函数，遍历所有可能落子点，选择得分最高的点
         /// </summary>
-        public Point GenerateMove(IGameView gameView, PlayerKnowledge knowledge)
+        public Point GenerateMove()
         {
+            System.Diagnostics.Debug.WriteLine($"[GenerateMove] {PlayerColor} 开始决策");
+            
             Point bestMove = Point.Pass();
-            GoBoard bestGuessBoard = knowledge.GetBestGuessBoard(PlayerColor);
+            GoBoard bestGuessBoard = Knowledge.GetBestGuessBoard(PlayerColor);
             double bestScore = double.MinValue;
 
             // 设置一个权重来平衡局面分数和位置分数
             // 在开局时，位置分数更重要；后期则局面分数更重要
             const double positionalWeight = 0.5; // 权重可以调整
+            
+            int candidateCount = 0;
 
-            for (int x = 1;x <= gameView.BoardSize;++x)
+            for (int x = 1;x <= Knowledge.BoardSize;++x)
             {
-                for(int y = 1;y <= gameView.BoardSize;++y)
+                for(int y = 1;y <= Knowledge.BoardSize;++y)
                 {
                     Point point = new Point(x, y);
-                    if(knowledge.GetMemoryState(point) != MemoryPointState.Unknown)
+                    var memoryState = Knowledge.GetMemoryState(point);
+                    
+                    if(memoryState != MemoryPointState.Unknown)
                     {
+                        if (point.X == 5 && point.Y == 5) // E5的特殊调试
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[GenerateMove] {PlayerColor} 跳过 E5，记忆状态: {memoryState}");
+                        }
                         continue;
                     }
+                    
+                    candidateCount++;
+                    
                     // 模拟落子
                     GoBoard tmpBoard = bestGuessBoard.Clone();
                     tmpBoard.PlaceStone(point, PlayerColor);
@@ -62,6 +75,7 @@ namespace PhantomGo.Core.Agents
                     double score = Evaluate(tmpBoard);
                     double positionalBonus = InitialPositionBonus[x, y];
                     score += positionalBonus * positionalWeight;
+                    
 
                     if (score > bestScore)
                     {
@@ -70,6 +84,8 @@ namespace PhantomGo.Core.Agents
                     }
                 }
             }
+            
+            System.Diagnostics.Debug.WriteLine($"[GenerateMove] {PlayerColor} 找到 {candidateCount} 个候选位置，选择: {bestMove}");
             return bestMove;
         }
         /// <summary>
@@ -166,6 +182,10 @@ namespace PhantomGo.Core.Agents
                 }
             }
             return (myTerritory, opponentTerritory);
+        }
+        public override string ToString()
+        {
+            return "AgentPlayer";
         }
     }
 }

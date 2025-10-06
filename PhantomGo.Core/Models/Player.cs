@@ -42,5 +42,9 @@ namespace PhantomGo.Core.Models
             }
             return false;
         }
+        public static string ToString(this Player player)
+        {
+            return player == Player.Black ? "⚫ " : "⚪ ";
+        }
     }
 }

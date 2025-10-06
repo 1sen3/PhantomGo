@@ -14,7 +14,11 @@ using PhantomGo.Core.Helper;
 using PhantomGo.Core.Logic;
 using PhantomGo.Core.Models;
 using PhantomGo.Core.Views;
+using PhantomGo.Models;
+using PhantomGo.Services;
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Numerics;
 using System.Text;
@@ -26,13 +30,20 @@ namespace PhantomGo
 {
     public sealed partial class MainWindow : Window
     {
-        private GameController _gameController;
-        private readonly IPlayerAgent _aiPlayer;
-        private bool _isAiThinking = false;
+        private GameLogicService _gameLogicService;
+        private TimerService _timerService;
+        private GameInfoService GameInfo => GameInfoService.Instance;
+        private Player CurrentPlayer => _gameLogicService.CurrentPlayer;
+        private ObservableCollection<Move> MoveHistory => _gameLogicService.MoveHistory;
 
+        // Win2D 棋盘布局参数
         private float _gridSpacing;
         private float _stoneRadius;
         private float _canvasRenderSize;
+        private int _boardSize => _gameLogicService.Game.BoardSize;
+
+        private int _boardView; // 0: 裁判 1：黑方 2：白方
+        private Point? _hoverPoint = null;
 
         // 为坐标标签定义的边距和字体格式
         private const float LabelMargin = 30;
@@ -43,7 +54,7 @@ namespace PhantomGo
             this.InitializeComponent();
             ExtendsContentIntoTitleBar = true;
             AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
-            AppWindow.Resize(new Windows.Graphics.SizeInt32(2055, 1497));
+            AppWindow.Resize(new Windows.Graphics.SizeInt32(1130, 800));
 
             BoardSegmented.SelectedItem = RefereeSegment;
             StatusSegmented.SelectedItem = GameStatusSegment;
@@ -55,31 +66,61 @@ namespace PhantomGo
                 VerticalAlignment = CanvasVerticalAlignment.Center
             };
 
-            _aiPlayer = new SimpleAgentPlayer(9, Player.White);
-            StartNewGame();
-        }
+            _boardView = 0;
 
-        private void StartNewGame()
-        {
-            if (_gameController != null)
-            {
-                _gameController.EndGame();
-            }
-            _gameController = new GameController(9);
-            _isAiThinking = false;
+            _gameLogicService = new GameLogicService();
+            _timerService = new TimerService();
 
-            // 计算布局
             CalculateLayout();
+            UpdateBoard();
 
-            UpdateUI();
+            // 绑定事件
+            SubscribeToEvents();
+            
+
+            // 启动计时器
+            _timerService.StartTimer();
         }
+        private void SubscribeToEvents()
+        {
+            // 游戏逻辑事件
+            _gameLogicService.CurrentPlayerChanged += UpdateCurrentPlayer;
+            _gameLogicService.ScoreChanged += UpdateScores;
+            _gameLogicService.CapturedCountChanged += UpdateCapturedCount;
+            _gameLogicService.AiThinkingChanged += UpdateIsAiThinking;
+            _gameLogicService.GameEnded += OnGameEnded;
+            _gameLogicService.MoveAdded += OnMoveAdded;
+            _gameLogicService.BoardChanged += UpdateBoard; // 订阅棋盘更新事件
+
+            // 计时器事件
+            _timerService.TimeUpdated += UpdateThinkingTime;
+            
+        }
+        #region Event Handlers
+        private async void OnGameEnded(string result)
+        {
+            ContentDialog dialog = new ContentDialog
+            {
+                Title = "游戏结束",
+                Content = result.ToString(),
+                CloseButtonText = "好的",
+                XamlRoot = this.Content.XamlRoot
+            };
+            dialog.CloseButtonClick += (s, e) => _gameLogicService.StartNewGame();
+            await dialog.ShowAsync();
+        }
+        private void OnMoveAdded(Move move)
+        {
+            _timerService.RestartTimer();
+        }
+        #endregion
 
         #region UI Event Handlers
 
-        private void GameBoardCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
+        private async void GameBoardCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            if (_gameController.CurrentPlayer == Player.White ||
-                _gameController.CurrentGameState != GameState.Playing || _isAiThinking)
+            // 检查是否可以进行人类操作
+            if (!_gameLogicService.CanHumanInteract())
             {
                 return;
             }
@@ -89,164 +130,116 @@ namespace PhantomGo
 
             if (logicalPoint.X > 0)
             {
-                var result = _gameController.MakeMove(logicalPoint);
-                _aiPlayer.ReceiveRefereeUpdate(Player.Black, logicalPoint, result);
-                Debug.Print($"玩家落子: {logicalPoint}, 结果: {result.IsSuccess}, 提子: {string.Join(",", result.CapturedPoints)}");
-                if (result.IsSuccess)
+                try
                 {
-                    UpdateUI();
-                    TriggerAiMove();
-                }
-                else
+                    await _gameLogicService.MakeHumanMove(logicalPoint);
+
+                    UpdateBoard();
+                } catch(Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"落子失败: {result.Message}");
+                    var dialog = new ContentDialog
+                    {
+                        Title = "落子失败",
+                        Content = ex.Message,
+                        CloseButtonText = "好的",
+                        XamlRoot = this.Content.XamlRoot
+                    };
+                    await dialog.ShowAsync();
                 }
             }
         }
 
-        private void PassButton_Click(object sender, RoutedEventArgs e)
+        private async void PassButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_gameController.CurrentGameState != GameState.Playing || _isAiThinking) return;
+           if (!_gameLogicService.CanHumanInteract()) return;
 
-            var result = _gameController.Pass();
-            if (result.IsSuccess)
+            try
             {
-                _aiPlayer.ReceiveRefereeUpdate(Player.Black, new Point(0, 0), result);
-            }
-
-            UpdateUI();
-
-            if (_gameController.CurrentPlayer == Player.White)
+                await _gameLogicService.MakePass();
+            } catch(Exception ex)
             {
-                TriggerAiMove();
-            }
-        }
-
-        private async void UndoButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isAiThinking) return;
-
-            var result = _gameController.Undo(true);
-            if (!result.IsSuccess)
-            {
-                ContentDialog dialog = new ContentDialog
+                var dialog = new ContentDialog
                 {
-                    Title = "悔棋失败",
-                    Content = result.Message,
+                    Title = "虚着失败",
+                    Content = ex.Message,
                     CloseButtonText = "好的",
                     XamlRoot = this.Content.XamlRoot
                 };
                 await dialog.ShowAsync();
             }
-            UpdateUI();
+
+            UpdateBoard();
+        }
+
+        private async void UndoButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_gameLogicService.CanHumanInteract()) return;
+            try
+            {
+                await _gameLogicService.MakeUndo();
+            } catch(Exception ex)
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = "悔棋失败",
+                    Content = ex.Message,
+                    CloseButtonText = "好的",
+                    XamlRoot = this.Content.XamlRoot
+                };
+                await dialog.ShowAsync();
+            }
+
+            UpdateBoard();
         }
 
         private void NewGameButton_Click(object sender, RoutedEventArgs e)
         {
-            StartNewGame();
+            _gameLogicService.StartNewGame();
+            UpdateBoard();
         }
 
         #endregion
 
         #region Game Logic Integration
 
-        private async void TriggerAiMove()
+        private void UpdateBoard()
         {
-            if (_gameController.CurrentPlayer == Player.White && _gameController.CurrentGameState == GameState.Playing)
-            {
-                _isAiThinking = true;
-                UpdateUI();
-
-                var gameView = new PhantomGoView(_gameController, Player.White);
-
-                await Task.Delay(200);
-                var aiMove = _aiPlayer.GenerateMove(gameView, _aiPlayer.Knowledge);
-
-                if(aiMove == Point.Pass())
-                {
-                    var passResult = _gameController.Pass();
-                    _aiPlayer.ReceiveRefereeUpdate(Player.White, aiMove, passResult);
-                    Debug.Print($"AI选择了Pass, 结果: {passResult.IsSuccess}");
-                    _isAiThinking = false;
-                    UpdateUI();
-                    return;
-                }
-
-                var result = _gameController.MakeMove(aiMove);
-                _aiPlayer.ReceiveRefereeUpdate(Player.White, aiMove, result);
-                if (result.IsSuccess == false)
-                {
-                    TriggerAiMove();
-                }
-
-                Debug.Print($"AI落子: {aiMove}, 结果: {result.IsSuccess}, 提子: {string.Join(",", result.CapturedPoints)}");
-
-                _isAiThinking = false;
-                UpdateUI();
-            }
-        }
-
-        private void UpdateUI()
-        {
-            CurrentPlayerText.Text = _gameController.CurrentPlayer == Player.Black ? "⚫ HumanPlayer" : "⚪ AgentPlayer";
-            BlackCapturesText.Text = _gameController.CapturedPointCount[Player.Black].ToString();
-            WhiteCapturesText.Text = _gameController.CapturedPointCount[Player.White].ToString();
-
-            PassButton.IsEnabled = !_isAiThinking;
-            UndoButton.IsEnabled = !_isAiThinking;
-
             GameBoardCanvas.Invalidate();
-
-            if (_gameController.CurrentGameState != GameState.Playing)
-            {
-                DispatcherQueue.TryEnqueue(async () => await ShowGameOverDialog());
-            }
         }
-
-        private async Task ShowGameOverDialog()
+        private void UpdateCapturedCount(int blackCaptured, int whiteCaptured)
         {
-            var score = _gameController.GetScoreResult();
-            StringBuilder result = new StringBuilder();
-            result.Append($"最终得分：黑方 {score.BlackScore} vs 白方 {score.WhiteScore}，");
-            if (score.BlackScore > score.WhiteScore)
-            {
-                result.Append("黑方 (先手) 胜利！");
-            }
-            else if (score.BlackScore < score.WhiteScore)
-            {
-                result.Append("白方 (后手) 胜利！");
-            }
-            else
-            {
-                result.Append("平局！");
-            }
-            ContentDialog dialog = new ContentDialog
-            {
-                Title = "游戏结束",
-                Content = result.ToString(),
-                CloseButtonText = "好的",
-                XamlRoot = this.Content.XamlRoot
-            };
-            await dialog.ShowAsync();
+            BlackCapturesText.Text = blackCaptured.ToString();
+            WhiteCapturesText.Text = whiteCaptured.ToString();
+        }
+        private void UpdateScores(ScoreResult score)
+        {
+            BlackScore.Text = score.BlackScore.ToString();
+            WhiteScore.Text = score.WhiteScore.ToString();
+        }
+        private void UpdateIsAiThinking(bool isThinking)
+        {
+            PassButton.IsEnabled = !isThinking;
+            UndoButton.IsEnabled = !isThinking;
         }
 
+        private void UpdateThinkingTime(int seconds)
+        {
+            ThinkingTime.Text = seconds.ToString();
+        }
+        private void UpdateCurrentPlayer(string playerName)
+        {
+            CurrentPlayerText.Text = playerName;
+        }
         #endregion
 
         #region Win2D Drawing & Coordinates
 
         private void CalculateLayout()
         {
-            // [修改] canvas尺寸由Border尺寸和Padding决定 (800 - 40*2 = 720)
             _canvasRenderSize = 720;
-
-            // [修改] 用于绘制棋盘网格的区域大小，需要减去两边的标签边距
             float boardAreaSize = _canvasRenderSize - (2 * LabelMargin);
-
-            // [修改] 网格间距基于新的棋盘区域大小计算
-            _gridSpacing = boardAreaSize / (_gameController.BoardSize); // 注意：这里的除数改为了 BoardSize，使得线条刚好落在区域边缘
-                                                                        // 如果希望棋盘线与标签间有更大空隙，可以改回 BoardSize + 1
-
-            _stoneRadius = _gridSpacing * 0.35f; // 棋子半径略小于半格
+            _gridSpacing = boardAreaSize / (_gameLogicService.Game.BoardSize);
+            _stoneRadius = _gridSpacing * 0.35f;
         }
 
         private void GameBoardCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
@@ -255,12 +248,12 @@ namespace PhantomGo
             var ds = args.DrawingSession;
             ds.Antialiasing = CanvasAntialiasing.Antialiased;
 
-            // [修改] 棋盘网格的绘制起点偏移，现在需要考虑标签边距
+            // 棋盘网格的绘制起点偏移，现在需要考虑标签边距
             float gridOffset = LabelMargin + (_gridSpacing / 2); // 网格线从半个格距开始
-            float boardPixelSize = _gridSpacing * (_gameController.BoardSize - 1);
+            float boardPixelSize = _gridSpacing * (_boardSize - 1);
 
-            // [新增] 1. 绘制坐标标签
-            for (int i = 0; i < _gameController.BoardSize; i++)
+            // 1. 绘制坐标标签
+            for (int i = 0; i < _boardSize; i++)
             {
                 // 绘制列号 (A-I)
                 var colChar = Convert.ToChar('A' + i);
@@ -279,16 +272,16 @@ namespace PhantomGo
                 ds.DrawText(rowNum, _canvasRenderSize - LabelMargin / 2, yPos, Colors.Gray, _labelTextFormat);
             }
 
-            // [修改] 2. 绘制棋盘线 (使用新的gridOffset)
-            for (int i = 0; i < _gameController.BoardSize; i++)
+            // 2. 绘制棋盘线 (使用新的gridOffset)
+            for (int i = 0; i < _boardSize; i++)
             {
                 float pos = gridOffset + i * _gridSpacing;
                 ds.DrawLine(gridOffset, pos, gridOffset + boardPixelSize, pos, Colors.Black, 1.5f); // 横线
                 ds.DrawLine(pos, gridOffset, pos, gridOffset + boardPixelSize, Colors.Black, 1.5f); // 竖线
             }
 
-            // [修改] 3. 绘制星位 (LogicalToScreen已更新，无需改动此处逻辑)
-            if (_gameController.BoardSize == 9)
+            // 3. 绘制星位 (LogicalToScreen已更新，无需改动此处逻辑)
+            if (_boardSize == 9)
             {
                 // 9路棋盘星位: (3,3), (7,3), (5,5), (3,7), (7,7)
                 var starPoints = new[]
@@ -303,22 +296,87 @@ namespace PhantomGo
                 }
             }
 
-            // [修改] 4. 绘制棋子 (LogicalToScreen已更新，无需改动此处逻辑)
-            for (int x = 1; x <= _gameController.BoardSize; x++)
+            // 4. 绘制棋子 (LogicalToScreen已更新，无需改动此处逻辑)
+            Point_Draw(ds);
+
+            // 5.检查是否有悬停点，并且当前是轮到人类玩家下棋
+            if (_hoverPoint.HasValue && _gameLogicService.CanHumanInteract())
             {
-                for (int y = 1; y <= _gameController.BoardSize; y++)
+                var center = LogicalToScreen(_hoverPoint.Value);
+                var hoverColor = Color.FromArgb(32, 0, 0, 0);
+                ds.FillCircle(center, _stoneRadius, hoverColor);
+            }
+        }
+
+        private void Point_Draw(CanvasDrawingSession ds)
+        {
+            if(_boardView == 0) // 裁判视角
+            {
+                for (int x = 1; x <= _boardSize; x++)
                 {
-                    var point = new Point(x, y);
-                    var state = _gameController.GetPointState(point);
-                    if (state != PointState.None)
+                    for (int y = 1; y <= _boardSize; y++)
                     {
-                        var center = LogicalToScreen(point);
-                        var color = (state == PointState.black) ? Colors.Black : Colors.White;
-                        ds.FillCircle(center, _stoneRadius, color);
-                        ds.DrawCircle(center, _stoneRadius, Colors.Gray, 0.8f);
+                        var point = new Point(x, y);
+                        var state = _gameLogicService.GetPointState(point);
+                        if (state != PointState.None)
+                        {
+                            var center = LogicalToScreen(point);
+                            var color = (state == PointState.black) ? Colors.Black : Colors.White;
+                            ds.FillCircle(center, _stoneRadius, color);
+                            ds.DrawCircle(center, _stoneRadius, Colors.Gray, 0.8f);
+                        }
+                    }
+                }
+            } else if(_boardView == 1) // 黑方视角
+            {
+                var knowledge = _gameLogicService.GetPlayerKnowledge(Player.Black);
+                for (int x = 1; x <= _boardSize; x++)
+                {
+                    for (int y = 1; y <= _boardSize; y++)
+                    {
+                        var point = new Point(x, y);
+                        var state = knowledge.GetMemoryState(point);
+                        if (state == MemoryPointState.Self) // 己方棋子
+                        {
+                            var center = LogicalToScreen(point);
+                            var color = Colors.Black;
+                            ds.FillCircle(center, _stoneRadius, color);
+                            ds.DrawCircle(center, _stoneRadius, Colors.Gray, 0.8f);
+                        } else if(state == MemoryPointState.InferredOpponent) // 不可落子点
+                        {
+                            var center = LogicalToScreen(point);
+                            var color = Colors.IndianRed;
+                            ds.FillCircle(center, _stoneRadius, color);
+                            ds.DrawCircle(center, _stoneRadius, Colors.Gray, 0.8f);
+                        }
+                    }
+                }
+            } else if(_boardView == 2) // 白方视角
+            {
+                var knowledge = _gameLogicService.GetPlayerKnowledge(Player.White);
+                for (int x = 1; x <= _boardSize; x++)
+                {
+                    for (int y = 1; y <= _boardSize; y++)
+                    {
+                        var point = new Point(x, y);
+                        var state = knowledge.GetMemoryState(point);
+                        if (state == MemoryPointState.Self)
+                        {
+                            var center = LogicalToScreen(point);
+                            var color = Colors.White;
+                            ds.FillCircle(center, _stoneRadius, color);
+                            ds.DrawCircle(center, _stoneRadius, Colors.Gray, 0.8f);
+                        } else if(state == MemoryPointState.InferredOpponent)
+                        {
+                            var center = LogicalToScreen(point);
+                            var color = Colors.MediumVioletRed;
+                            ds.FillCircle(center, _stoneRadius, color);
+                            ds.DrawCircle(center, _stoneRadius, Colors.Gray, 0.8f);
+                        }
                     }
                 }
             }
+
         }
 
         private Vector2 LogicalToScreen(Point logicalPoint)
@@ -346,10 +404,50 @@ namespace PhantomGo
             int y = (int)Math.Round((screenPoint.Y - gridOffset) / _gridSpacing) + 1;
 
             // 检查边界
-            if (x < 1 || x > _gameController.BoardSize || y < 1 || y > _gameController.BoardSize)
+            if (x < 1 || x > _boardSize || y < 1 || y > _boardSize)
                 return new Point(0, 0);
 
             return new Point(x, y);
+        }
+
+        private void GameBoardCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            // 不是人类玩家回合，不显示悬停点
+            if (!_gameLogicService.CanHumanInteract())
+            {
+                // 如果有悬停点，清除它
+                if (_hoverPoint != null)
+                {
+                    _hoverPoint = null;
+                    GameBoardCanvas.Invalidate();
+                }
+                return;
+            }
+            var screenPoint = e.GetCurrentPoint(GameBoardCanvas).Position;
+            var logicalPoint = ScreenToLogical(new Vector2((float)screenPoint.X, (float)screenPoint.Y));
+            Point? newHoverPoint = null;
+            var view = _gameLogicService.GetPhantomGoView(CurrentPlayer);
+            // 检查转换后的点是否在棋盘内，并且该位置是空的
+            if (logicalPoint.X > 0 && view.GetPointState(logicalPoint) == PointState.None)
+            {
+                newHoverPoint = logicalPoint;
+            }
+            // 仅当悬停点发生变化时才更新并重绘，以提高性能
+            if (_hoverPoint != newHoverPoint)
+            {
+                _hoverPoint = newHoverPoint;
+                GameBoardCanvas.Invalidate(); // 请求重绘
+            }
+        }
+
+        private void GameBoardCanvas_PointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            // 当鼠标离开画布时，清除悬停点
+            if (_hoverPoint != null)
+            {
+                _hoverPoint = null;
+                GameBoardCanvas.Invalidate(); // 请求重绘以擦除提示
+            }
         }
 
         #endregion
@@ -366,6 +464,23 @@ namespace PhantomGo
                 GameStatusCard.Visibility = Visibility.Collapsed;
                 HistoryCard.Visibility = Visibility.Visible;
             }
+        }
+
+        private void BoardSegmented_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            switch(BoardSegmented.SelectedIndex)
+            {
+                case 0:
+                    _boardView = 1;
+                    break;
+                case 1:
+                    _boardView = 0;
+                    break;
+                case 2:
+                    _boardView = 2;
+                    break;
+            }
+            GameBoardCanvas.Invalidate();
         }
     }
 }

@@ -85,6 +85,7 @@ namespace PhantomGo.Core.Logic
         }
 
         #region 辅助方法
+
         /// <summary>
         /// 检查一个落子是否合法（不修改当前棋盘状态）
         /// </summary>

@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -43,9 +43,22 @@ namespace PhantomGo.Core.Helper
         /// <summary>
         /// 生成文件名
         /// </summary>
-        private string GenerateFileName()
+        public string GenerateFileName()
         {
-            return $"PG-{_blackTeamName} vs {_whiteTeamName}-{_winnerInfo}-{_gameDateTimeAndLocation}-{_eventName}.txt";
+            // 清理文件名中的非法字符
+            string safeName = $"PG-{_blackTeamName} vs {_whiteTeamName}-{_winnerInfo}-{_gameDateTimeAndLocation}-{_eventName}.txt";
+            
+            // 替换Windows文件名中的非法字符
+            char[] invalidChars = Path.GetInvalidFileNameChars();
+            foreach (char c in invalidChars)
+            {
+                safeName = safeName.Replace(c, '-');
+            }
+            
+            // 特别处理冒号（可能不在非法字符列表中但会引起问题）
+            safeName = safeName.Replace(':', '-').Replace('：', '-');
+            
+            return safeName;
         }
         /// <summary>
         /// 生成棋谱头部信息
@@ -87,32 +100,54 @@ namespace PhantomGo.Core.Helper
             var moveSequence = GenerateMoveSequence();
             return $"({header};{moveSequence})";
         }
-        public void SaveSgfToFile(string path = "")
+        public void SaveSgfToFile()
         {
             try
             {
-                if(!string.IsNullOrEmpty(path) && !Directory.Exists(path))
+
+                string targetPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "PhantomGo");
+
+                if(!Directory.Exists(targetPath))
                 {
-                    Directory.CreateDirectory(path);
+                    Directory.CreateDirectory(targetPath);
                 }
+
                 string fileName = GenerateFileName();
-                foreach(char c in Path.GetInvalidFileNameChars())
-                {
-                    fileName = fileName.Replace(c, '_');
-                }
-
-                string fullPath = Path.Combine(path, fileName);
+                string fullPath = Path.Combine(targetPath, fileName);
                 string content = GenerateSgfContent();
+                
+                System.Diagnostics.Debug.WriteLine($"完整文件路径: {fullPath}");
+                System.Diagnostics.Debug.WriteLine($"文件内容长度: {content.Length} 字符");
 
-                // 使用 GB2312 编码写入文件
-                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-                Encoding gb2312 = Encoding.GetEncoding("GB2312");
+                // 使用 UTF-8 编码写入文件
                 File.WriteAllText(fullPath, content, Encoding.UTF8);
-                Console.WriteLine($"棋谱已成功保存到: {fullPath}");
+                
+                // 验证文件是否存在
+                bool fileExists = File.Exists(fullPath);
+                long fileSize = fileExists ? new FileInfo(fullPath).Length : 0;
+                
+                string successMsg = $"棋谱已成功保存到: {fullPath}";
+                Console.WriteLine(successMsg);
+                System.Diagnostics.Debug.WriteLine(successMsg);
+                System.Diagnostics.Debug.WriteLine($"文件存在检查: {fileExists}, 文件大小: {fileSize} 字节");
+                
+                // 尝试打开文件所在文件夹
+                try
+                {
+                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{fullPath}\"");
+                    System.Diagnostics.Debug.WriteLine("已尝试打开文件所在文件夹");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"无法打开文件夹: {ex.Message}");
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"错误：保存棋谱文件失败。{ex.Message}");
+                string errorMsg = $"错误：保存棋谱文件失败。{ex.Message}";
+                Console.WriteLine(errorMsg);
+                System.Diagnostics.Debug.WriteLine(errorMsg);
+                System.Diagnostics.Debug.WriteLine($"异常详情: {ex}");
             }
         }
     }

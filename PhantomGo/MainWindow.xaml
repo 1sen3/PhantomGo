@@ -8,6 +8,7 @@
     xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:ui="using:CommunityToolkit.WinUI"
+    xmlns:models="using:PhantomGo.Models"
     mc:Ignorable="d">
 
     <Window.SystemBackdrop>
@@ -43,19 +44,44 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <controls:Segmented HorizontalAlignment="Center"
-                                    x:Name="BoardSegmented">
-                    <controls:SegmentedItem Content="黑方棋盘"
+                <Grid Grid.Row="0" Margin="26 0 26 0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <controls:Segmented x:Name="BoardSegmented"
+                                        SelectionChanged="BoardSegmented_SelectionChanged"
+                                        Grid.Column="0">
+                        <controls:SegmentedItem Content="黑方棋盘"
                                             Icon="{ui:FontIcon Glyph=&#xEA3B;}"
                                             x:Name="BlackSegment"/>
-                    <controls:SegmentedItem Content="裁判棋盘"
+                        <controls:SegmentedItem Content="裁判棋盘"
                                             Icon="{ui:FontIcon Glyph=&#xE80A;}"
                                             x:Name="RefereeSegment"/>
-                    <controls:SegmentedItem Content="白方棋盘"
+                        <controls:SegmentedItem Content="白方棋盘"
                                             Icon="{ui:FontIcon Glyph=&#xEA3A;}"
                                             x:Name="WhiteSegment"/>
-                </controls:Segmented>
-                
+                    </controls:Segmented>
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                Spacing="10">
+                        <Button x:Name="PassButton" 
+                                Content="虚着" 
+                                Click="PassButton_Click"/>
+
+                        <Button x:Name="UndoButton" 
+                                Content="悔棋" 
+                                Click="UndoButton_Click"/>
+
+                        <Button x:Name="NewGameButton" 
+                                Content="重置"
+                                Click="NewGameButton_Click" 
+                                Style="{ThemeResource AccentButtonStyle}"/>
+                    </StackPanel>
+                </Grid>
+
                 <Viewbox Margin="20"
                          Grid.Row="1">
                     <Border x:Name="GameBoardCard"
@@ -71,7 +97,9 @@
 
                         <canvas:CanvasControl x:Name="GameBoardCanvas"
                                           Draw="GameBoardCanvas_Draw"
-                                          PointerPressed="GameBoardCanvas_PointerPressed"/>
+                                          PointerPressed="GameBoardCanvas_PointerPressed"
+                                          PointerMoved="GameBoardCanvas_PointerMoved"
+                                          PointerExited="GameBoardCanvas_PointerExited"/>
                     </Border>
                 </Viewbox>
             </Grid>
@@ -110,51 +138,70 @@
 
                         <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,5,0,0"
                                     HorizontalAlignment="Center">
-                            <TextBlock Text="⚫ HumanPlayer" FontWeight="SemiBold"/>
-                            <TextBlock Text="|" FontWeight="SemiBold"/>
-                            <TextBlock Text="⚪ AgentPlayer" FontWeight="SemiBold"/>
+                            <TextBlock Text="⚫" FontWeight="SemiBold"/>
+                            <TextBlock Text="{x:Bind GameInfo.BlackTeamName}" FontWeight="SemiBold"/>
+                            <TextBlock Text="|" FontWeight="SemiBold" Foreground="{ThemeResource CardStrokeColorDefaultBrush}"/>
+                            <TextBlock Text="{x:Bind GameInfo.WhiteTeamName}" FontWeight="SemiBold"/>
+                            <TextBlock Text="⚪" FontWeight="SemiBold"/>
                         </StackPanel>
 
-                        <StackPanel Orientation="Horizontal" Spacing="0" Margin="0,5,0,0">
-                            <TextBlock Text="比赛" FontWeight="Bold"/>
-                            <TextBlock Text="进行中，" FontWeight="Bold"/>
+                        <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="0 5 0 5 "/>
+
+                        <StackPanel Orientation="Horizontal" Spacing="0" Margin="0,5,0,0"
+                                    HorizontalAlignment="Center">
+                            <TextBlock Text="比赛" FontWeight="Bold" FontSize="16"/>
+                            <TextBlock Text="进行中" FontWeight="Bold" FontSize="16"/>
                         </StackPanel>
 
                         <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,5,0,0">
                             <TextBlock Text="现在轮到" FontWeight="SemiBold"/>
                             <TextBlock x:Name="CurrentPlayerText" Text="..."/>
-                            <TextBlock Text="落子。" FontWeight="SemiBold"/>
+                            <TextBlock Text="落子，" FontWeight="SemiBold"/>
                         </StackPanel>
 
-                        <TextBlock Text="提子数" Margin="0,15,0,0" FontSize="18" FontWeight="Bold"/>
-                        <StackPanel Orientation="Horizontal" Spacing="5">
-                            <TextBlock Text="黑方:" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="BlackCapturesText" Text="0"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="5">
-                            <TextBlock Text="白方:" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="WhiteCapturesText" Text="0"/>
+                        <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,5,0,0">
+                            <TextBlock Text="已用时" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="ThinkingTime" Text="0" FontWeight="SemiBold"/>
+                            <TextBlock Text="秒。" FontWeight="SemiBold"/>
                         </StackPanel>
 
-                        <TextBlock Text="操作" Margin="0,35,0,0" FontSize="18" FontWeight="Bold"/>
-                        <Button x:Name="PassButton" 
-                            Content="虚着" 
-                            HorizontalAlignment="Stretch" 
-                            Click="PassButton_Click"/>
+                        <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="0 15 0 0"/>
 
-                        <Button x:Name="UndoButton" 
-                            Content="悔棋" 
-                            HorizontalAlignment="Stretch" 
-                            Click="UndoButton_Click"/>
+                        <!-- 提子数 -->
+                        <StackPanel Orientation="Vertical" Spacing="12" Margin="0,15,0,0">
+                            <TextBlock Text="提子数" FontSize="16" FontWeight="Bold"
+                                   HorizontalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="{x:Bind _gameLogicService.BlackTeamName}" FontWeight="SemiBold"/>
+                                <TextBlock Text=":"/>
+                                <TextBlock x:Name="BlackCapturesText" Text="0"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="{x:Bind _gameLogicService.WhiteTeamName}" FontWeight="SemiBold"/>
+                                <TextBlock Text=":"/>
+                                <TextBlock x:Name="WhiteCapturesText" Text="0"/>
+                            </StackPanel>
+                        </StackPanel>
+                       
+                        <!-- 得分 -->
+                        <StackPanel Orientation="Vertical" Spacing="12" Margin="0,15,0,0">
+                            <TextBlock Text="得分" FontSize="16" FontWeight="Bold"
+                                   HorizontalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="{x:Bind _gameLogicService.BlackTeamName}" FontWeight="SemiBold"/>
+                                <TextBlock Text=":"/>
+                                <TextBlock x:Name="BlackScore" Text="0"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="{x:Bind _gameLogicService.WhiteTeamName}" FontWeight="SemiBold"/>
+                                <TextBlock Text=":"/>
+                                <TextBlock x:Name="WhiteScore" Text="0"/>
+                            </StackPanel>
+                        </StackPanel>
 
-                        <Button x:Name="NewGameButton" 
-                            Content="重置"
-                            HorizontalAlignment="Stretch"
-                            Click="NewGameButton_Click" 
-                            Style="{ThemeResource AccentButtonStyle}"/>
                     </StackPanel>
                 </Border>
-                
+
                 <!-- 历史记录 -->
                 <Border Grid.Row="1"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -166,9 +213,18 @@
                         VerticalAlignment="Stretch"
                         Visibility="Collapsed"
                         x:Name="HistoryCard">
-                    <ListView Padding="10">
-                        <ListViewItem Content="⚫ HumanPlayer 在 A1 处落子"/>
-                        <ListViewItem Content="⚪ AgentPlayer 在 E5 处落子"/>
+                    <ListView Padding="10"
+                              ItemsSource="{x:Bind MoveHistory}"
+                              x:Name="HistoryListView">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:Move">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <TextBlock Text="{x:Bind Id}" Margin="0,0,5,0" Foreground="DarkGray"/>
+                                    <TextBlock Text="{x:Bind player}"/>
+                                    <TextBlock Text="{x:Bind message}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
                     </ListView>
                 </Border>
             </Grid>

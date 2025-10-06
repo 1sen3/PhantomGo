@@ -25,9 +25,7 @@ namespace PhantomGo.Core.Agents
         /// <summary>
         /// 生成一个落子点
         /// </summary>
-        /// <param name="gameView">当前玩家的棋局视图</param>
-        /// <returns>决策出的落子点</returns>
-        Point GenerateMove(IGameView gameView, PlayerKnowledge knowledge);
+        Point GenerateMove();
         /// <summary>
         /// 根据裁判返回的信息，更新记忆（新版）
         /// </summary>

@@ -19,7 +19,7 @@ namespace PhantomGo.Core.Agents
             Knowledge = new PlayerKnowledge(boardSize);
             PlayerColor = playerColor;
         }
-        public Point GenerateMove(IGameView gameView, PlayerKnowledge knowledge)
+        public Point GenerateMove()
         {
             while(true)
             {
@@ -46,6 +46,10 @@ namespace PhantomGo.Core.Agents
                     }
                 }
             }
+        }
+        public override string ToString()
+        {
+            return "HumanPlayer";
         }
     }
 }
