@@ -24,7 +24,7 @@ namespace PhantomGo.Core.Logic
         private GoBoard _board;
         private readonly List<GameStateRecord> _history; // 操作历史（棋谱）
         private readonly List<MoveRecord> _moveHistory;
-        private int _consecutivePasses; // 连续 pass 次数
+        private int _consecutivePasses;
         /// <summary>  
         /// 获取当前棋局状态
         /// </summary>

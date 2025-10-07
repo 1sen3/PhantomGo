@@ -12,6 +12,7 @@ namespace PhantomGo.Core.Agents
 {
     public class HumanPlayer : IPlayerAgent
     {
+        public int MoveCount { get; set; }
         public PlayerKnowledge Knowledge { get; }
         public Player PlayerColor { get; }
         public HumanPlayer(int boardSize, Player playerColor)

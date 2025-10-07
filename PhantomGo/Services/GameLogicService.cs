@@ -243,25 +243,20 @@ namespace PhantomGo.Services
         {
             var currentPlayer = _gameController.CurrentPlayer; 
             var currentAgent = _playerAgents[currentPlayer];
-            
-            Debug.WriteLine($"[ExecuteAiMove] 开始执行 {currentPlayer} 的AI动作");
 
-            // 检查当前玩家是否为AI
             if (currentAgent is HumanPlayer)
             {
-                Debug.WriteLine($"[ExecuteAiMove] 当前玩家 {currentPlayer} 是人类，跳过AI执行");
                 return;
             }
 
             _isAiThinking = true;
             AiThinkingChanged?.Invoke(_isAiThinking);
-            
-            var gameView = new PhantomGoView(_gameController, currentPlayer);
 
+            Debug.WriteLine($"[ExecuteAiMove] 开始执行 {currentPlayer} 的AI动作");
+
+            var gameView = new PhantomGoView(_gameController, currentPlayer);
             await Task.Delay(200);
-            var point = currentAgent.GenerateMove();
-            
-            Debug.WriteLine($"[ExecuteAiMove] AI {currentPlayer} 选择落子位置: {point}");
+            var point = await Task.Run(() => currentAgent.GenerateMove());
 
             PlayResult result;
 
@@ -299,6 +294,7 @@ namespace PhantomGo.Services
             };
             MoveHistory.Insert(0, move);
             MoveAdded?.Invoke(move);
+            currentAgent.OnMoveSuccess();
 
             _isAiThinking = false;
             AiThinkingChanged?.Invoke(_isAiThinking);

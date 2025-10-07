@@ -14,6 +14,7 @@ namespace PhantomGo.Core.Agents
     /// </summary>
     public interface IPlayerAgent
     {
+        int MoveCount { get; set; }
         /// <summary>
         /// 玩家的棋局知识库
         /// </summary>
@@ -86,6 +87,10 @@ namespace PhantomGo.Core.Agents
                     }
                 }
             }
+        }
+        void OnMoveSuccess()
+        {
+            MoveCount++;
         }
     }
 }

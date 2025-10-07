@@ -10,9 +10,8 @@ namespace PhantomGo.Models
     public enum AgentEnum
     {
         HumanPlayer = 0,
-        RandomPlayer = 1,
-        SimpleAgentPlayer = 2,
-        MCTSPlayer = 3,
+        SimpleAgentPlayer = 1,
+        MCTSPlayer = 2,
     }
 
     public static class AgentEnumExtensions
@@ -22,9 +21,8 @@ namespace PhantomGo.Models
             return playerEnum switch
             {
                 AgentEnum.HumanPlayer => new HumanPlayer(boardSize, playerColor),
-                AgentEnum.RandomPlayer => new RandomPlayer(boardSize, playerColor),
                 AgentEnum.SimpleAgentPlayer => new SimpleAgentPlayer(boardSize, playerColor),
-                //AgentEnum.MCTSPlayer => new MCTSPlayer(boardSize, playerColor),
+                AgentEnum.MCTSPlayer => new MCTSPlayer(boardSize, playerColor),
                 _ => throw new ArgumentOutOfRangeException(nameof(playerEnum), $"Not expected player enum value: {playerEnum}"),
             };
         }
