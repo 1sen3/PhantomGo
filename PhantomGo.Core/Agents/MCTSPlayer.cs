@@ -20,12 +20,15 @@ namespace PhantomGo.Core.Agents
         private readonly Random _random = new Random();
         private readonly int _simulationsPerMove;
 
-        public MCTSPlayer(int boardSize, Player playerColor, int simulationPerMove = 5000)
+        private readonly Evaluator _evaluator;
+
+        public MCTSPlayer(int boardSize, Player playerColor, int simulationPerMove = 1000)
         {
             Knowledge = new PlayerKnowledge(boardSize);
             PlayerColor = playerColor;
             MoveCount = 0;
             _simulationsPerMove = simulationPerMove;
+            _evaluator = new Evaluator();
         }
         public void OnMoveSuccess() => MoveCount++;
 
@@ -116,7 +119,6 @@ namespace PhantomGo.Core.Agents
         }
         private Player Simulate(MCTSNode node)
         {
-            // ✅ 关键优化：每次 Determinize 后缓存空点列表
             GoBoard simBoard = node.Knowledge.Determinize(node.PlayerToMove);
             Player currentPlayer = node.PlayerToMove;
 
@@ -137,23 +139,37 @@ namespace PhantomGo.Core.Agents
 
             for (int i = 0; i < maxSteps && emptyPoints.Count > 0; ++i)
             {
-                // ✅ 直接从空点中随机选择
-                int randomIndex = _random.Next(emptyPoints.Count);
-                Point move = emptyPoints[randomIndex];
+                Point bestMove = Point.Pass();
+                double bestScore = double.MinValue;
 
-                // ✅ 快速放置：不检查合法性，失败就跳过
-                try
+                // 遍历所有合法空点，找到评估分数最高的点
+                foreach (var move in emptyPoints)
                 {
-                    simBoard.PlaceStone(move, currentPlayer);
-                    emptyPoints.RemoveAt(randomIndex);  // 移除已下的点
-                    consecutivePassesInSim = 0;
+                    if (simBoard.IsValidMove(move, currentPlayer))
+                    {
+                        GoBoard tmpBoard = simBoard.Clone();
+                        tmpBoard.PlaceStone(move, currentPlayer);
+                        double score = _evaluator.Evaluate(tmpBoard, currentPlayer);
+
+                        if (score > bestScore)
+                        {
+                            bestScore = score;
+                            bestMove = move;
+                        }
+                    }
                 }
-                catch
+
+                // 如果没有找到任何可以落子的点，就pass
+                if (bestMove.Equals(Point.Pass()))
                 {
-                    // 如果放置失败（自杀等），也从列表中移除该点
-                    emptyPoints.RemoveAt(randomIndex);
                     consecutivePassesInSim++;
-                    if (consecutivePassesInSim >= 3) break;
+                    if (consecutivePassesInSim >= 2) break;
+                }
+                else
+                {
+                    simBoard.PlaceStone(bestMove, currentPlayer);
+                    emptyPoints.Remove(bestMove);
+                    consecutivePassesInSim = 0;
                 }
 
                 currentPlayer = currentPlayer.GetOpponent();

@@ -78,7 +78,7 @@ namespace PhantomGo.Core.Models
         /// <returns>一个代表当前局势猜测的 GoBoard 对象</returns>
         public GoBoard GetBestGuessBoard(Player currentPlayer)
         {
-            GoBoard guessBoard = new GoBoard(BoardSize);
+            GoBoard guessBoard = new GoBoard();
             Player opponentPlayer = currentPlayer.GetOpponent();
             for(int x = 1;x <= BoardSize;++x)
             {
@@ -101,7 +101,7 @@ namespace PhantomGo.Core.Models
         /// </summary>
         public GoBoard Determinize(Player self)
         {
-            var board = new GoBoard(BoardSize);
+            var board = new GoBoard();
             var opponent = self.GetOpponent();
             var unkonwnPoints = new List<Point>();
 

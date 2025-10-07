@@ -45,9 +45,9 @@ namespace PhantomGo.Core.Logic
         /// 初始化游戏控制器
         /// </summary>
         /// <param name="boardSize"></param>
-        public GameController(int boardSize)
+        public GameController()
         {
-            _board = new GoBoard(boardSize);
+            _board = new GoBoard();
             _history = new List<GameStateRecord>();
             _moveHistory = new List<MoveRecord>();
             CurrentPlayer = Player.Black; // 黑子先行

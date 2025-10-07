@@ -13,7 +13,7 @@ namespace PhantomGo.Core.Views
         {
             _gameController = game;
             _player = player;
-            _playerBoard = new GoBoard(game.BoardSize);
+            _playerBoard = new GoBoard();
             for(int x = 1;x <= _playerBoard.Size;++x)
             {
                 for(int y = 1;y <= _playerBoard.Size;++y)

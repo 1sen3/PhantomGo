@@ -96,7 +96,7 @@ namespace PhantomGo.Services
             {
                 _gameController.EndGame();
             }
-            _gameController = new GameController(9);
+            _gameController = new GameController();
             _isAiThinking = false;
 
             // 清空历史记录和 AI 记忆
