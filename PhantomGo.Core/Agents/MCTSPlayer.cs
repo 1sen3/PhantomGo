@@ -268,5 +268,40 @@ namespace PhantomGo.Core.Agents
             }
         }
         #endregion
+
+        #region 辅助方法
+        private PointState IsKoish(GoBoard board, Point point)
+        {
+            if(board.GetPointState(point) != PointState.None) return PointState.None;
+            var neighborColors = board.GetNeighbors(point).Select(n => board.GetPointState(n)).ToHashSet();
+            if(neighborColors.Count == 1 && !neighborColors.Contains(PointState.None)) {
+                return neighborColors.First();
+            } else
+            {
+                return PointState.None;
+            }
+        }
+        private PointState IsEyeish(GoBoard board, Point point)
+        {
+            if (point == Point.Pass()) return PointState.None;
+            var color = IsKoish(board, point);
+            if (color == PointState.None) return PointState.None;
+            var colorSet = new HashSet<PointState> { color, PointState.None };
+            int diagonalFaults = 0;
+            var diagonals = board.GetDiagonals(point);
+            if(diagonals.Count < 4)
+            {
+                diagonalFaults += 1;
+            }
+            foreach(var diagonal in diagonals)
+            {
+                if(!colorSet.Contains(board.GetPointState(diagonal))) {
+                    diagonalFaults += 1;
+                }
+            }
+            if (diagonalFaults > 1) return PointState.None;
+            else return color;
+        }
+        #endregion
     }
 }

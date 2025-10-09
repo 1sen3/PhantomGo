@@ -21,6 +21,9 @@ namespace PhantomGo.Core.Logic
         private static readonly ZobristHash _zobrist;
         private readonly HashSet<ulong> _historyHashes; // 检测全局同形
 
+        private readonly Dictionary<Point, List<Point>> NEIGHBORS_CACHE;
+        private readonly Dictionary<Point, List<Point>> DIAGONALS_CACHE;
+
         public int Size { get; private set; }
         static GoBoard()
         {
@@ -33,6 +36,8 @@ namespace PhantomGo.Core.Logic
             _currentHash = 0;
             _historyHashes = new HashSet<ulong>();
             _historyHashes.Add(_currentHash);
+            NEIGHBORS_CACHE = InitializeNeighbors();
+            DIAGONALS_CACHE = InitializeDiagonals();
         }
         public ulong GetCurrentHash() => _currentHash;
 
@@ -148,12 +153,14 @@ namespace PhantomGo.Core.Logic
                    point.Y <= Size && point.Y > 0;
         }
 
-        public IEnumerable<Point> GetNeighbors(Point point)
+        public List<Point> GetNeighbors(Point point)
         {
-            if (point.X > 1) yield return new Point(point.X - 1, point.Y);
-            if (point.X < Size) yield return new Point(point.X + 1, point.Y);
-            if (point.Y > 1) yield return new Point(point.X, point.Y - 1);
-            if (point.Y < Size) yield return new Point(point.X, point.Y + 1);
+            return NEIGHBORS_CACHE[point];
+        }
+
+        public List<Point> GetDiagonals(Point point)
+        {
+            return DIAGONALS_CACHE[point];
         }
 
         public int GetLiberty(Point point)
@@ -225,6 +232,44 @@ namespace PhantomGo.Core.Logic
             return points;
         }
 
+        public Dictionary<Point, List<Point>> InitializeNeighbors()
+        {
+            var neighborsDic = new Dictionary<Point, List<Point>>();
+            for (int x = 1; x <= Size; ++x)
+            {
+                for (int y = 1; y <= Size; ++y)
+                {
+                    var point = new Point(x, y);
+                    neighborsDic.Add(point, new List<Point>
+                    {
+                        new Point(x - 1, y),
+                        new Point(x + 1, y),
+                        new Point(x, y - 1),
+                        new Point(x, y + 1)
+                    }.Where(p => IsOnBoard(p)).ToList());
+                }
+            }
+            return neighborsDic;
+        }
+        public Dictionary<Point, List<Point>> InitializeDiagonals()
+        {
+            var digonalsDic = new Dictionary<Point, List<Point>>();
+            for (int x = 1; x <= Size; ++x)
+            {
+                for (int y = 1; y <= Size; ++y)
+                {
+                    var point = new Point(x, y);
+                    digonalsDic.Add(point, new List<Point>
+                    {
+                        new Point(x + 1, y + 1),
+                        new Point(x - 1, y - 1),
+                        new Point(x + 1, y - 1),
+                        new Point(x - 1, y + 1)
+                    }.Where(p => IsOnBoard(p)).ToList());
+                }
+            }
+            return digonalsDic;
+        }
         private PointState PlayerToPointState(Player player)
         {
             return player == Player.Black ? PointState.black : PointState.white;
