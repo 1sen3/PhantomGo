@@ -24,6 +24,8 @@ namespace PhantomGo.Core.Logic
         private readonly Dictionary<Point, List<Point>> NEIGHBORS_CACHE;
         private readonly Dictionary<Point, List<Point>> DIAGONALS_CACHE;
 
+        public GameState GameState { get; set; }
+
         public record struct UndoInfo(Point Point, Point? PreviousKoPoint, List<Point> CapturedPoints, ulong PreviousHash);
 
         public int Size { get; private set; }
@@ -34,6 +36,7 @@ namespace PhantomGo.Core.Logic
         public GoBoard()
         {
             Size = 9;
+            GameState = GameState.Playing;
             _board = new PointState[Size + 1, Size + 1];
             _currentHash = 0;
             _historyHashes = new HashSet<ulong>();

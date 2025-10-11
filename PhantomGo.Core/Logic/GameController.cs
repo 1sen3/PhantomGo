@@ -224,6 +224,7 @@ namespace PhantomGo.Core.Logic
         public void EndGame()
         {
             CurrentGameState = GameState.Ended;
+            _board.GameState = GameState.Ended;
         }
         /// <summary>
         /// 重置棋局

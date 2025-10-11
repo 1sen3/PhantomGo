@@ -23,11 +23,25 @@ namespace PhantomGo.Core.Models
     public class PlayerKnowledge
     {
         private readonly MemoryPointState[,] _memeryBoard;
+        private readonly Queue<MemoryPointState[,]> _history;
+        public const int HistoryLength = 8;
         public int BoardSize { get; }
         public PlayerKnowledge(int boardSize)
         {
             BoardSize = boardSize;
             _memeryBoard = new MemoryPointState[boardSize + 1, boardSize + 1];
+            _history = new Queue<MemoryPointState[,]>();
+        }
+        /// <summary>
+        /// 在更新知识时，也更新历史记录
+        /// </summary>
+        private void UpdateHistory()
+        {
+            _history.Enqueue((MemoryPointState[,]) _memeryBoard.Clone());
+            if (_history.Count > HistoryLength)
+            {
+                _history.Dequeue();
+            }
         }
         /// <summary>
         /// 获取某个点的记忆状态
@@ -43,6 +57,7 @@ namespace PhantomGo.Core.Models
         public void AddOwnState(Point point)
         {
             _memeryBoard[point.X, point.Y] = MemoryPointState.Self;
+            UpdateHistory();
         }
         /// <summary>
         /// 落子失败时，更新记忆状态
@@ -50,6 +65,7 @@ namespace PhantomGo.Core.Models
         public void MarkAsInferred(Point point)
         {
             _memeryBoard[point.X, point.Y] = MemoryPointState.InferredOpponent;
+            UpdateHistory();
         }
         /// <summary>
         /// 自己的棋子被提子时，移除记忆状态
@@ -57,6 +73,7 @@ namespace PhantomGo.Core.Models
         public void RemoveState(Point point)
         {
             _memeryBoard[point.X, point.Y] = MemoryPointState.Unknown;
+            UpdateHistory();
         }
         /// <summary>
         /// 清空所有记忆
@@ -70,6 +87,16 @@ namespace PhantomGo.Core.Models
                     _memeryBoard[x, y] = MemoryPointState.Unknown;
                 }
             }
+        }
+        public MemoryPointState[,] GetHistoryState(int stepsAgo)
+        {
+            // stepsAgo = 0 是当前状态，1是上一步，以此类推
+            int index = _history.Count - 1 - stepsAgo;
+            if(index > 0)
+            {
+                return _history.ElementAt(index);
+            }
+            return null;
         }
         /// <summary>
         /// 根据当前记忆，构建并返回一个最佳猜测棋盘
@@ -100,6 +127,10 @@ namespace PhantomGo.Core.Models
         {
             var newKnowledge = new PlayerKnowledge(BoardSize);
             Array.Copy(this._memeryBoard, newKnowledge._memeryBoard, this._memeryBoard.Length);
+            foreach(var h in this._history)
+            {
+                newKnowledge._history.Enqueue((MemoryPointState[,]) h.Clone());
+            }
             return newKnowledge;
         }
     }
