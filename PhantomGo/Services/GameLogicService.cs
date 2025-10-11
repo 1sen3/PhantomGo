@@ -127,8 +127,6 @@ namespace PhantomGo.Services
 
             var currentPlayer = _gameController.CurrentPlayer;
             var currentAgent = _playerAgents[currentPlayer];
-            
-            Debug.WriteLine($"[ContinueGameFlow] 当前玩家: {currentPlayer}, 是否人类: {currentAgent is HumanPlayer}");
 
             // 如果当前玩家是人类，等待人类操作
             if (currentAgent is HumanPlayer)
@@ -141,8 +139,6 @@ namespace PhantomGo.Services
             Debug.WriteLine($"[ContinueGameFlow] 执行AI玩家 {currentPlayer} 动作");
             await ExecuteAiMove();
 
-            // 递归继续游戏流程
-            Debug.WriteLine($"[ContinueGameFlow] 递归继续游戏流程");
             await ContinueGameFlow();
         }
         // 处理人类玩家落子
@@ -252,8 +248,6 @@ namespace PhantomGo.Services
             _isAiThinking = true;
             AiThinkingChanged?.Invoke(_isAiThinking);
 
-            Debug.WriteLine($"[ExecuteAiMove] 开始执行 {currentPlayer} 的AI动作");
-
             var gameView = new PhantomGoView(_gameController, currentPlayer);
             await Task.Delay(200);
             var point = await Task.Run(() => currentAgent.GenerateMove());
@@ -299,8 +293,6 @@ namespace PhantomGo.Services
             _isAiThinking = false;
             AiThinkingChanged?.Invoke(_isAiThinking);
             NotifyAllUIUpdates();
-            
-            Debug.WriteLine($"[ExecuteAiMove] AI {currentPlayer} 动作完成");
         }
         private void NotifyAllUIUpdates()
         {

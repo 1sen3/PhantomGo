@@ -96,48 +96,6 @@ namespace PhantomGo.Core.Models
             }
             return guessBoard;
         }
-        /// <summary>
-        /// 确定化：根据当前知识，生成一个随机但合法的完整棋盘状态
-        /// </summary>
-        public GoBoard Determinize(Player self)
-        {
-            var board = new GoBoard();
-            var opponent = self.GetOpponent();
-            var unkonwnPoints = new List<Point>();
-
-            int selfStones = 0;
-            int opponentStones = 0;
-
-            for(int x = 1;x <= BoardSize;++x)
-            {
-                for(int y = 1;y <= BoardSize;++y)
-                {
-                    var point = new Point(x, y);
-                    var state = GetMemoryState(point);
-                    if (state == MemoryPointState.Self) { board.PlaceStone(point, self); selfStones++; }
-                    else if (state == MemoryPointState.InferredOpponent) { board.PlaceStone(point, opponent); opponentStones++; }
-                    else unkonwnPoints.Add(point);
-                }
-            }
-
-            unkonwnPoints.Shuffle();
-
-            var nextToPlace = (selfStones <= opponentStones) ? self : opponent;
-
-            foreach(var point in unkonwnPoints)
-            {
-                if(board.IsValidMove(point, nextToPlace))
-                {
-                    board.PlaceStone(point, nextToPlace);
-                    nextToPlace = nextToPlace.GetOpponent();
-                } else if(board.IsValidMove(point, nextToPlace.GetOpponent()))
-                {
-                    board.PlaceStone(point, nextToPlace.GetOpponent());
-                }
-            }
-
-            return board;
-        }
         public PlayerKnowledge Clone()
         {
             var newKnowledge = new PlayerKnowledge(BoardSize);

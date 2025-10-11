@@ -8,7 +8,7 @@ namespace PhantomGo.Core.Helpers
 {
     public static class ListHelper
     {
-        private static Random random = new Random();
+        private static Random random => System.Random.Shared;
         public static void Shuffle<T>(this IList<T> list)
         {
             int n = list.Count;

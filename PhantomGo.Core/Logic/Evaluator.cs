@@ -161,6 +161,13 @@ namespace PhantomGo.Core.Logic
                                 connectivityScore += 0.25;
                             }
                         }
+                        foreach(var diagonal in board.GetDiagonals(point))
+                        {
+                            if(board.GetPointState(diagonal) == playerColor)
+                            {
+                                connectivityScore += 0.15;
+                            }
+                        }
                     }
                 }
             }

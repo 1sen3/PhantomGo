@@ -24,6 +24,8 @@ namespace PhantomGo.Core.Logic
         private readonly Dictionary<Point, List<Point>> NEIGHBORS_CACHE;
         private readonly Dictionary<Point, List<Point>> DIAGONALS_CACHE;
 
+        public record struct UndoInfo(Point Point, Point? PreviousKoPoint, List<Point> CapturedPoints, ulong PreviousHash);
+
         public int Size { get; private set; }
         static GoBoard()
         {
@@ -110,6 +112,87 @@ namespace PhantomGo.Core.Logic
 
             return PlayResult.Success(capturedStones.Distinct().ToList(), String.Empty);
         }
+        public UndoInfo? PlaceStoneForSimulation(Point point, Player player)
+        {
+            if(!IsOnBoard(point) || GetPointState(point) != PointState.None || (_koPoint.HasValue && _koPoint.Value == point))
+            {
+                return null;
+            }
+
+            var previousHash = _currentHash;
+            var previousKoPoint = _koPoint;
+
+            var stoneColor = PlayerToPointState(player);
+            _board[point.X, point.Y] = stoneColor;
+
+            // 提子逻辑
+            var capturedStones = new List<Point>();
+            var opponent = PlayerToPointState(player.GetOpponent());
+            foreach (var neighbor in GetNeighbors(point))
+            {
+                if (GetPointState(neighbor) == opponent)
+                {
+                    var (group, liberties) = FindGroup(neighbor);
+                    if (liberties == 0)
+                    {
+                        capturedStones.AddRange(group);
+                    }
+                }
+            }
+
+            var (ownGroup, ownLiberties) = FindGroup(point);
+            if (capturedStones.Count == 0 && ownLiberties == 0)
+            {
+                _board[point.X, point.Y] = PointState.None;
+                return null;
+            }
+
+            ulong nextHash = _currentHash;
+            nextHash ^= _zobrist.GetHash(point.X, point.Y, (int)stoneColor);
+            foreach (var captured in capturedStones.Distinct())
+            {
+                nextHash ^= _zobrist.GetHash(captured.X, captured.Y, (int)opponent);
+            }
+            if (_historyHashes.Contains(nextHash))
+            {
+                _board[point.X, point.Y] = PointState.None;
+                return null;
+            }
+
+            _currentHash = nextHash;
+            _historyHashes.Add(_currentHash);
+            _koPoint = null;
+
+            if (capturedStones.Count > 0)
+            {
+                RemoveGroup(capturedStones.Distinct().ToList(), false);
+                // 当提子数为 1 时，判断是否形成劫
+                if (capturedStones.Count == 1)
+                {
+                    // 进一步判断是否是真的劫（即提子后我方棋子是否只有一口气）
+                    if (capturedStones.Count == 1 && ownGroup.Count == 1 && ownLiberties == 1)
+                    {
+                        _koPoint = capturedStones.First();
+                    }
+                }
+            }
+
+            return new UndoInfo(point, previousKoPoint, capturedStones.Distinct().ToList(), previousHash);
+        }
+        public void UndoMove(UndoInfo undoInfo, Player player)
+        {
+            _board[undoInfo.Point.X, undoInfo.Point.Y] = PointState.None;
+
+            var opponent = PlayerToPointState(player.GetOpponent());
+            foreach(var point in undoInfo.CapturedPoints)
+            {
+                _board[point.X, point.Y] = opponent;
+            }
+
+            _historyHashes.Remove(_currentHash);
+            _currentHash = undoInfo.PreviousHash;
+            _koPoint = undoInfo.PreviousKoPoint;
+        }
 
         #region 辅助方法
         public bool IsValidMove(Point point, Player player)
@@ -169,7 +252,7 @@ namespace PhantomGo.Core.Logic
             return liberty;
         }
 
-        private (HashSet<Point> group, int liberties) FindGroup(Point startPoint)
+        public (HashSet<Point> group, int liberties) FindGroup(Point startPoint)
         {
             // 获取起点状态，如果无子，直接返回
             var state = GetPointState(startPoint);
@@ -270,7 +353,7 @@ namespace PhantomGo.Core.Logic
             }
             return digonalsDic;
         }
-        private PointState PlayerToPointState(Player player)
+        public static PointState PlayerToPointState(Player player)
         {
             return player == Player.Black ? PointState.black : PointState.white;
         }
