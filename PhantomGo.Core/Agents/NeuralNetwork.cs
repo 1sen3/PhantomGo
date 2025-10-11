@@ -14,8 +14,6 @@ namespace PhantomGo.Core.Agents
         private readonly string _inputName;
         private readonly string _policyOutputName;
         private readonly string _valueOutputName;
-        private const int BoardSize = 9;
-        private const int NumChannels = 17;
 
         public NeuralNetwork(string modelPath)
         {
@@ -47,43 +45,37 @@ namespace PhantomGo.Core.Agents
 
         private DenseTensor<float> BoardToTensor(PlayerKnowledge knowledge, Player player)
         {
-            // 按照模型期望的 NHWC 格式创建数组
-            var tensorData = new float[1 * BoardSize * BoardSize * NumChannels];
-            var opponent = player.GetOpponent();
+            const int numChannels = 17;
+            const int boardSize = 9;
+            var tensorData = new float[1 * boardSize * boardSize * numChannels];
 
-            // 遍历棋盘上的每一个点 (x, y)
-            for (int y = 1; y <= BoardSize; y++)
+            for (int y = 1; y <= boardSize; y++)
             {
-                for (int x = 1; x <= BoardSize; x++)
+                for (int x = 1; x <= boardSize; x++)
                 {
-                    // --- 核心修改：为每个点填充所有通道的数据 ---
-                    int baseIndex = ((y - 1) * BoardSize + (x - 1)) * NumChannels;
+                    int baseIndex = ((y - 1) * boardSize + (x - 1)) * numChannels;
+                    var state = knowledge.GetMemoryState(new Point(x, y));
 
-                    // --- 填充历史通道 (0-15) ---
-                    for (int t = 0; t < PlayerKnowledge.HistoryLength; t++)
+                    // Channel 0: 我方棋子位置
+                    if (state == MemoryPointState.Self)
                     {
-                        var historicState = knowledge.GetHistoryState(t);
-                        if (historicState != null)
-                        {
-                            var state = historicState[x, y];
-                            // 我方历史通道
-                            if (state == MemoryPointState.Self)
-                                tensorData[baseIndex + t] = 1f;
-
-                            // 对方历史通道
-                            if (state == MemoryPointState.InferredOpponent)
-                                tensorData[baseIndex + t + PlayerKnowledge.HistoryLength] = 1f;
-                        }
+                        tensorData[baseIndex + 0] = 1f;
+                    }
+                    // Channel 1: 对方推测的棋子位置
+                    else if (state == MemoryPointState.InferredOpponent)
+                    {
+                        tensorData[baseIndex + 1] = 1f;
                     }
 
-                    // --- 填充最后一个颜色通道 (16) ---
+                    // Channel 16: 轮到谁下棋 (全1代表黑方, 全0代表白方)
                     float colorToMove = (player == Player.Black) ? 1.0f : 0.0f;
                     tensorData[baseIndex + 16] = colorToMove;
+
+                    // 其他通道保持为0
                 }
             }
 
-            // 使用正确的维度顺序创建张量: [batch, height, width, channels]
-            return new DenseTensor<float>(tensorData, new[] { 1, BoardSize, BoardSize, NumChannels });
+            return new DenseTensor<float>(tensorData, new[] { 1, boardSize, boardSize, numChannels });
         }
 
         public void Dispose() => _session?.Dispose();

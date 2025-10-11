@@ -15,7 +15,7 @@ namespace PhantomGo.Core.Agents
 
         private readonly Random _random = new Random();
         private readonly int _simulationsPerMove;
-        private readonly NeuralNetwork _neuralNet; // 神经网络
+        private readonly NeuralNetwork _neuralNet;
 
         public MCTSPlayer(int boardSize, Player playerColor, int simulationPerMove = 800)
         {
@@ -24,7 +24,7 @@ namespace PhantomGo.Core.Agents
             MoveCount = 0;
             _simulationsPerMove = simulationPerMove;
 
-            // 加载您转换好的、专门用于9x9棋盘的ONNX模型
+            // 加载 ONNX 模型
             _neuralNet = new NeuralNetwork("D:\\Project\\ComputerGame\\PhantomGo\\PhantomGo\\PhantomGo.Core\\Assets\\model.onnx");
         }
 
@@ -66,8 +66,7 @@ namespace PhantomGo.Core.Agents
 
         private void ExpandAndEvaluate(MCTSNode node)
         {
-            // **核心步骤**:
-            // 1. 获取一个用于评估的棋盘状态 (这里我们仍然用BestGuessBoard作为示例)
+            // 1. 获取一个用于评估的棋盘状态
             var boardForEval = node.Knowledge.GetBestGuessBoard(node.PlayerToMove);
 
             // 如果游戏已经结束，则直接根据结果进行反向传播
@@ -88,9 +87,15 @@ namespace PhantomGo.Core.Agents
             foreach (var move in legalMoves)
             {
                 PlayerKnowledge newKnowledge = node.Knowledge.Clone();
-                // (此处可以根据游戏规则更新 newKnowledge)
+                if(node.PlayerToMove == PlayerColor)
+                {
+                    newKnowledge.AddOwnState(move);
+                } else
+                {
+                    newKnowledge.MarkAsInferred(move);
+                }
 
-                int moveIndex = (move.Y - 1) * 9 + (move.X - 1);
+                    int moveIndex = (move.Y - 1) * 9 + (move.X - 1);
                 float priorProbability = policy[moveIndex];
 
                 node.Children.Add(new MCTSNode(newKnowledge, node.PlayerToMove.GetOpponent(), node.MoveCount + 1, node, move, priorProbability));

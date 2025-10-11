@@ -223,7 +223,7 @@ namespace PhantomGo.Services
                 {
                     Id = MoveHistory.Count + 1,
                     player = TeamNames[currentPlayer],
-                    message = "选择了虚着",
+                    message = "选择了 PASS",
                 };
                 MoveHistory.Insert(0, move);
                 MoveAdded?.Invoke(move);
@@ -255,10 +255,12 @@ namespace PhantomGo.Services
             PlayResult result;
 
             // 检查是否是Pass操作
+            bool isPass = false;
             if (point.Equals(Point.Pass()))
             {
                 Debug.WriteLine($"[ExecuteAiMove] AI {currentPlayer} 选择Pass");
                 result = _gameController.Pass();
+                isPass = true;
             }
             else
             {
@@ -284,7 +286,7 @@ namespace PhantomGo.Services
             {
                 Id = MoveHistory.Count + 1,
                 player = TeamNames[currentPlayer],
-                message = $"在 {point} 处落子",
+                message = isPass ? "选择了 PASS" : $"在 {point} 处落子",
             };
             MoveHistory.Insert(0, move);
             MoveAdded?.Invoke(move);

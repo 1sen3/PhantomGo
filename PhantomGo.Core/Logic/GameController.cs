@@ -83,11 +83,15 @@ namespace PhantomGo.Core.Logic
                 _moveHistory.RemoveAt(_moveHistory.Count - 1);
                 return playResult;
             }
+
             // 移动有效, 更新状态
+            _consecutivePasses = 0;
+
             if (playResult.CapturedPoints?.Count > 0)
             {
                 CapturedPointCount[CurrentPlayer] += playResult.CapturedPoints.Count;
             }
+
             // 切换玩家
             SwitchPlayer();
             return PlayResult.Success(playResult.CapturedPoints, $"落子成功，提子数为{playResult.CapturedPoints?.Count}");
