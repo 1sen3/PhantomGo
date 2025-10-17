@@ -15,6 +15,7 @@ using Microsoft.UI.Xaml.Navigation;
 using PhantomGo.Services;
 using PhantomGo.Models;
 using PhantomGo.Core.Models;
+using System.Threading.Tasks;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -52,7 +53,7 @@ public sealed partial class StartWindow : Window
         _isEventMode = false;
     }
 
-    private void Button_Click(object sender, RoutedEventArgs e)
+    private async void Button_Click(object sender, RoutedEventArgs e)
     {
         // 保存信息
         if(!string.IsNullOrEmpty(BlackTeamNameBox.Text))
@@ -83,8 +84,30 @@ public sealed partial class StartWindow : Window
         GameInfoService.Instance.WhiteAgent = whiteAgent.ToPlayerAgent(boardSize:9, playerColor:Player.White);
 
         // 跳转到游戏窗口
-        var gameWindow = new MainWindow();
-        gameWindow.Activate();
+        if(IsEventRadio.IsChecked.HasValue && IsEventRadio.IsChecked.Value == true)
+        {
+            var CheckIfFirst = new ContentDialog
+            {
+                Title = "是否先手",
+                Content = "是否为先手方？",
+                PrimaryButtonText = "是",
+                DefaultButton = ContentDialogButton.Primary,
+                CloseButtonText = "否",
+                XamlRoot = this.Content.XamlRoot,
+            };
+            var result = await CheckIfFirst.ShowAsync();
+            bool IsFirst = false;
+            if(result == ContentDialogResult.Primary)
+            {
+                IsFirst = true;
+            }
+            var gameWindow = new ContestWindow(IsFirst);
+            gameWindow.Activate();
+        } else
+        {
+            var gameWindow = new MainWindow();
+            gameWindow.Activate();
+        }
         this.Close();
     }
     private void InitializeAgentComboBox()

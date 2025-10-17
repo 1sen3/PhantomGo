@@ -25,7 +25,7 @@ namespace PhantomGo.Core.Agents
             _simulationsPerMove = simulationPerMove;
 
             // 加载 ONNX 模型
-            _neuralNet = new NeuralNetwork("D:\\Project\\ComputerGame\\PhantomGo\\PhantomGo\\PhantomGo.Core\\Assets\\model.onnx");
+            _neuralNet = new NeuralNetwork("D:\\Project\\ComputerGame\\PhantomGo\\PhantomGo\\PhantomGo.Core\\Assets\\model1.onnx");
         }
 
         public void OnMoveSuccess() => MoveCount++;

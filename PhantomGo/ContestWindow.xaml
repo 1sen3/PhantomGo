@@ -1,0 +1,219 @@
+<!-- MainWindow.xaml -->
+<Window
+    x:Class="PhantomGo.ContestWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:ui="using:CommunityToolkit.WinUI"
+    xmlns:models="using:PhantomGo.Models"
+    mc:Ignorable="d">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop/>
+    </Window.SystemBackdrop>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TitleBar Title="PhantomGo"
+                  IsBackButtonVisible="False"
+                  IsPaneToggleButtonVisible="False"
+                  Grid.Row="0"
+                  Height="48">
+            <TitleBar.IconSource>
+                <ImageIconSource x:Name="AppIcon"
+                                 ImageSource="/Assets/Square44x44Logo.altform-unplated_targetsize-256.png"/>
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <controls:Segmented x:Name="BoardSegmented"
+                                        Grid.Column="0"
+                                        HorizontalAlignment="Center">
+                        <controls:SegmentedItem Content="黑方棋盘"
+                                                Icon="{ui:FontIcon Glyph=&#xEA3B;}"
+                                                x:Name="BlackSegment"
+                                                Visibility="Collapsed"/>
+                        <controls:SegmentedItem Content="白方棋盘"
+                                                Icon="{ui:FontIcon Glyph=&#xEA3A;}"
+                                                x:Name="WhiteSegment"
+                                                Visibility="Collapsed"/>
+                    </controls:Segmented>
+                </Grid>
+
+                <Viewbox Grid.Row="1"
+                         Margin="20">
+                    <Border x:Name="GameBoardCard"
+                            Width="800" Height="800"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            Padding="40">
+                        <Border.Shadow>
+                            <ThemeShadow/>
+                        </Border.Shadow>
+
+                        <canvas:CanvasControl x:Name="GameBoardCanvas"
+                                          Draw="GameBoardCanvas_Draw"/>
+                    </Border>
+                </Viewbox>
+            </Grid>
+
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <controls:Segmented Grid.Row="0" HorizontalAlignment="Center" 
+                                    x:Name="StatusSegmented">
+                    <controls:SegmentedItem Content="比赛信息" 
+                                            Icon="{ui:FontIcon Glyph=&#xF0E3;}"
+                                            x:Name="GameStatusSegment"/>
+                </controls:Segmented>
+
+                <StackPanel Orientation="Vertical"
+                            Grid.Row="1">
+                    <!-- 棋局状态 -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            Margin="20"
+                            Width="300"
+                            Height="210"
+                            VerticalAlignment="Top"
+                            Visibility="Visible"
+                            x:Name="GameStatusCard">
+                        <StackPanel  Spacing="12">
+
+                            <StackPanel Orientation="Horizontal" 
+                                        Spacing="5"
+                                        Padding="0 16 0 0"
+                                        HorizontalAlignment="Center">
+                                <TextBlock Text="⚫" FontWeight="SemiBold"/>
+                                <TextBlock Text="{x:Bind GameInfo.BlackTeamName}" FontWeight="SemiBold"/>
+                                <TextBlock Text="|" FontWeight="SemiBold" Foreground="{ThemeResource CardStrokeColorDefaultBrush}"/>
+                                <TextBlock Text="{x:Bind GameInfo.WhiteTeamName}" FontWeight="SemiBold"/>
+                                <TextBlock Text="⚪" FontWeight="SemiBold"/>
+                            </StackPanel>
+
+                            <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="0 5 0 5 "/>
+
+                            <StackPanel Orientation="Horizontal" Spacing="0" Margin="0,5,0,0"
+                                    HorizontalAlignment="Center">
+                                <TextBlock Text="比赛" FontWeight="Bold" FontSize="16"/>
+                                <TextBlock Text="进行中" FontWeight="Bold" FontSize="16"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,5,0,0" Padding="24 0 0 0">
+                                <TextBlock Text="现在轮到" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="CurrentPlayerText" Text="..."/>
+                                <TextBlock Text="落子，" FontWeight="SemiBold"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,5,0,0" Padding="24 0 0 0">
+                                <TextBlock Text="已思考" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="ThinkingTime" Text="0" FontWeight="SemiBold"/>
+                                <TextBlock Text="秒。" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 历史记录 -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            Margin="0 0 0 24"
+                            Width="300"
+                            Height="300"
+                            Visibility="Visible"
+                            x:Name="HistoryCard">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            
+                            <TextBlock Grid.Row="0" Text="落子历史" HorizontalAlignment="Center" FontWeight="Bold" FontSize="16" Padding="0 16 0 0"/>
+
+                            <Border Grid.Row="1" Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="0 17 0 5 "/>
+                            
+                            <ListView Grid.Row="2" 
+                                      Padding="10"
+                                      ItemsSource="{x:Bind MoveHistory}"
+                                      x:Name="HistoryListView">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="models:Move">
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <TextBlock Text="{x:Bind Id}" Margin="0,0,5,0" Foreground="DarkGray"/>
+                                            <TextBlock Text="{x:Bind player}"/>
+                                            <TextBlock Text="{x:Bind message}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
+                    </Border>
+
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            Width="300"
+                            Height="116">
+                        <StackPanel Orientation="Vertical" Spacing="12">
+                            <TextBlock Grid.Row="0" Text="操作" HorizontalAlignment="Center" FontWeight="Bold" FontSize="16" Padding="0 16 0 0"/>
+
+                            <Border Grid.Row="1" Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="0 5 0 0 "/>
+
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="12"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <Button x:Name="CaptureButton" 
+                                Content="提子" 
+                                Click="CaptureButton_Click"/>
+
+                                <Button x:Name="UndoButton" 
+                                Content="悔棋" 
+                                Click="UndoButton_Click"/>
+
+                                <Button x:Name="MakeMoveButton" 
+                                Content="继续落子"
+                                Click="MakeMoveButton_Click" 
+                                Style="{ThemeResource AccentButtonStyle}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

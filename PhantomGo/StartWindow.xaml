@@ -17,7 +17,7 @@
         <StackPanel Orientation="Vertical"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Center"
-                    Spacing="24">
+                    Spacing="30">
             <StackPanel Orientation="Horizontal" Spacing="24" HorizontalAlignment="Center">
                 <Image Source="/Assets/StoreLogo.png" Width="64" Height="64"/>
                 <TextBlock Text="PhantomGo" VerticalAlignment="Center"
@@ -46,7 +46,7 @@
                     </ComboBox>
                 </StackPanel>
             </StackPanel>
-            
+
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Center">
                 <RadioButton Content="练习模式" x:Name="IsPracticeRadio" Checked="IsPracticeRadio_Checked"/>
@@ -60,7 +60,6 @@
                 <TextBox PlaceholderText="请输入比赛地点" Width="250"
                          x:Name="EventLocationBox"/>
             </StackPanel>
-            
 
             <Button Content="开始"
                     HorizontalAlignment="Center"

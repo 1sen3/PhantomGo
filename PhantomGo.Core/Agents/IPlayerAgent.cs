@@ -50,10 +50,7 @@ namespace PhantomGo.Core.Agents
             // 处理公开的提子信息
             if (result.CapturedPoints.Count > 0)
             {
-                foreach (var point in result.CapturedPoints)
-                {
-                    Knowledge.RemoveState(point);
-                }
+                Knowledge.OnPointCaptured(result.CapturedPoints);
             }
         }
         /// <summary>

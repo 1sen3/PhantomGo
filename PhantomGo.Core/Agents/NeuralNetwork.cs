@@ -3,8 +3,11 @@ using Microsoft.ML.OnnxRuntime.Tensors;
 using PhantomGo.Core.Logic;
 using PhantomGo.Core.Models;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Text;
 
 namespace PhantomGo.Core.Agents
 {
@@ -47,37 +50,75 @@ namespace PhantomGo.Core.Agents
         {
             const int numChannels = 17;
             const int boardSize = 9;
-            var tensorData = new float[1 * boardSize * boardSize * numChannels];
+            const int historyLength = 8;
+            var tensorData = new DenseTensor<float>(new[] { 1, boardSize, boardSize, numChannels });
 
-            for (int y = 1; y <= boardSize; y++)
+            var historyQueue = knowledge.GetHistory();
+            var historyList = historyQueue.Reverse().ToList();
+            while(historyList.Count < historyLength)
             {
-                for (int x = 1; x <= boardSize; x++)
+                historyList.Add(new MemoryPointState[boardSize + 1, boardSize + 1]);
+            }
+
+            for(int i = 0;i < historyLength;++i)
+            {
+                MemoryPointState[,] memoryState = historyList[i];
+
+                int myChannel = i * 2, opponentChannel = i * 2 + 1;
+                
+                for(int y = 1;y <= boardSize;++y)
                 {
-                    int baseIndex = ((y - 1) * boardSize + (x - 1)) * numChannels;
-                    var state = knowledge.GetMemoryState(new Point(x, y));
-
-                    // Channel 0: 我方棋子位置
-                    if (state == MemoryPointState.Self)
+                    for(int x = 1;x <= boardSize;++x)
                     {
-                        tensorData[baseIndex + 0] = 1f;
+                        var state = memoryState[y, x];
+                        if(state == MemoryPointState.Self)
+                        {
+                            tensorData[0, y - 1, x - 1, myChannel] = 1f;
+                        } else if(state == MemoryPointState.InferredOpponent)
+                        {
+                            tensorData[0, y - 1, x - 1, opponentChannel] = 1f;
+                        }
                     }
-                    // Channel 1: 对方推测的棋子位置
-                    else if (state == MemoryPointState.InferredOpponent)
-                    {
-                        tensorData[baseIndex + 1] = 1f;
-                    }
-
-                    // Channel 16: 轮到谁下棋 (全1代表黑方, 全0代表白方)
-                    float colorToMove = (player == Player.Black) ? 1.0f : 0.0f;
-                    tensorData[baseIndex + 16] = colorToMove;
-
-                    // 其他通道保持为0
                 }
             }
 
-            return new DenseTensor<float>(tensorData, new[] { 1, boardSize, boardSize, numChannels });
+            float playerToMove = (player == Player.Black) ? 1.0f : 0.0f;
+            for(int y = 0;y < boardSize;++y)
+            {
+                for(int x = 0; x < boardSize;++x)
+                {
+                    tensorData[0, y, x, 16] = playerToMove;
+                }
+            }
+
+            return tensorData;
         }
 
         public void Dispose() => _session?.Dispose();
+
+        /// <summary>
+        /// 将 DenseTensor 格式化打印到控制台
+        /// </summary>
+        private void PrintTensor(DenseTensor<float> tensor)
+        {
+            int channels = tensor.Dimensions[3];
+            int height = tensor.Dimensions[1];
+            int width = tensor.Dimensions[2];
+
+            for (int c = 0; c < channels; c++)
+            {
+                Console.WriteLine($"--- Channel {c} ---");
+                var sb = new StringBuilder();
+                for (int h = 0; h < height; h++)
+                {
+                    for (int w = 0; w < width; w++)
+                    {
+                        sb.Append(tensor[0, h, w, c] + " ");
+                    }
+                    sb.AppendLine();
+                }
+                Debug.WriteLine(sb.ToString());
+            }
+        }
     }
 }

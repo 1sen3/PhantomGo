@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -67,13 +68,35 @@ namespace PhantomGo.Core.Models
             _memeryBoard[point.X, point.Y] = MemoryPointState.InferredOpponent;
             UpdateHistory();
         }
+        public void OnPointCaptured(IReadOnlyList<Point> capturedPoints)
+        {
+            foreach(var point in capturedPoints)
+            {
+                RemoveState(point);
+                var neighbors = new List<Point>
+                {
+                    new Point(point.X - 1, point.Y),
+                    new Point(point.X + 1, point.Y),
+                    new Point(point.X, point.Y - 1),
+                    new Point(point.X, point.Y + 1)
+                }.Where(p => p.X >= 1 && p.X <= BoardSize && p.Y >= 1 && p.Y <= BoardSize);
+                foreach(var neighbor in neighbors)
+                {
+                    if(GetMemoryState(neighbor) == MemoryPointState.Unknown && !capturedPoints.Contains(neighbor))
+                    {
+                        //Debug.Write($"{neighbor} 被标记为对方棋子");
+                        MarkAsInferred(neighbor);
+                    }
+                }
+            }
+            UpdateHistory();
+        }
         /// <summary>
         /// 自己的棋子被提子时，移除记忆状态
         /// </summary>
         public void RemoveState(Point point)
         {
             _memeryBoard[point.X, point.Y] = MemoryPointState.Unknown;
-            UpdateHistory();
         }
         /// <summary>
         /// 清空所有记忆
@@ -122,6 +145,18 @@ namespace PhantomGo.Core.Models
                 }
             }
             return guessBoard;
+        }
+        public void SetCurrentBoardState(MemoryPointState[,] board)
+        {
+            Array.Copy(board, this._memeryBoard, board.Length);
+        }
+        public MemoryPointState[,] GetMemoryPointStates()
+        {
+            return _memeryBoard;
+        }
+        public Queue<MemoryPointState[,]> GetHistory()
+        {
+            return _history;
         }
         public PlayerKnowledge Clone()
         {
