@@ -11,5 +11,7 @@ namespace PhantomGo.Models
         public int Id { get; set; }
         public string player { get; set; }
         public string message { get; set; }
+
+        public string idAndMessage => $"{Id} {message}";
     }
 }

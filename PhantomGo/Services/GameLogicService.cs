@@ -250,7 +250,7 @@ namespace PhantomGo.Services
 
             var gameView = new PhantomGoView(_gameController, currentPlayer);
             await Task.Delay(200);
-            var point = await Task.Run(() => currentAgent.GenerateMove());
+            var point = await Task.Run(() => currentAgent.GenerateMove().Item2);
 
             PlayResult result;
 
@@ -275,6 +275,7 @@ namespace PhantomGo.Services
                 // AI移动失败，递归重试
                 _isAiThinking = false;
                 AiThinkingChanged?.Invoke(_isAiThinking);
+                currentAgent.OnMoveFailed();
                 await ExecuteAiMove();
                 return;
             }

@@ -76,7 +76,7 @@ namespace PhantomGo
 
             // 绑定事件
             SubscribeToEvents();
-            
+            UpdateCurrentPlayer(GameInfo.BlackTeamName);
 
             // 启动计时器
             _timerService.StartTimer();
@@ -264,7 +264,7 @@ namespace PhantomGo
                 ds.DrawText(colChar.ToString(), xPos, _canvasRenderSize - LabelMargin / 2, Colors.Gray, _labelTextFormat);
 
                 // 绘制行号 (1-9)
-                var rowNum = (i + 1).ToString(); // 围棋习惯，1在下方
+                var rowNum = (9 - i).ToString(); // 围棋习惯，1在下方
                 float yPos = gridOffset + i * _gridSpacing;
                 // 左侧
                 ds.DrawText(rowNum, LabelMargin / 2, yPos, Colors.Gray, _labelTextFormat);

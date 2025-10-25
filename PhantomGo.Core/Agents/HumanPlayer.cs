@@ -12,45 +12,33 @@ namespace PhantomGo.Core.Agents
 {
     public class HumanPlayer : IPlayerAgent
     {
-        public int MoveCount { get; set; }
-        public PlayerKnowledge Knowledge { get; }
+        public Dictionary<Player, int> MoveCount { get; set; }
+        public PlayerKnowledge Knowledge { get; set; }
         public Player PlayerColor { get; }
         public HumanPlayer(int boardSize, Player playerColor)
         {
-            Knowledge = new PlayerKnowledge(boardSize);
+            Knowledge = new PlayerKnowledge(boardSize, playerColor);
             PlayerColor = playerColor;
         }
-        public Point GenerateMove()
+        public (double, Point) GenerateMove()
         {
-            while(true)
-            {
-                Console.Write("请输入落子点（A1）、'pass'、'undo'或'quit'：");
-                string input = Console.ReadLine().ToLower().Trim();
-                if (input == "pass")
-                {
-                    return new Point(0, 0);
-                } else if (input == "undo")
-                {
-                    return new Point(0, 1);
-                } else if (input == "quit")
-                {
-                    return new Point(0, 2);
-                } else {
-                    try
-                    {
-                        return Point.TransInputToPoint(input);
-                    } catch(ArgumentException e)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine("输入不合法，请重试");
-                        Console.ResetColor();
-                    }
-                }
-            }
+            return (0, Point.Pass());
         }
         public override string ToString()
         {
             return "HumanPlayer";
+        }
+        public void OnMoveSuccess()
+        {
+            return;
+        }
+        public void OnMoveFailed()
+        {
+            return;
+        }
+        public void OnPointCaptured(List<Point> points)
+        {
+            return;
         }
     }
 }

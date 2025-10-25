@@ -50,5 +50,6 @@ namespace PhantomGo.Services
             StopTimer();
             StartTimer();
         }
+
     }
 }

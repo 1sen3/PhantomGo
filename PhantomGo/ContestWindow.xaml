@@ -96,21 +96,24 @@
                                             x:Name="GameStatusSegment"/>
                 </controls:Segmented>
 
-                <StackPanel Orientation="Vertical"
-                            Grid.Row="1">
+                <Grid Grid.Row="1"
+                      Margin="0 20 20 20">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="160"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="116"/>
+                    </Grid.RowDefinitions>
+                    
                     <!-- 棋局状态 -->
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             CornerRadius="8"
                             BorderThickness="1"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                            Margin="20"
                             Width="300"
-                            Height="210"
-                            VerticalAlignment="Top"
                             Visibility="Visible"
-                            x:Name="GameStatusCard">
+                            x:Name="GameStatusCard"
+                            Grid.Row="0">
                         <StackPanel  Spacing="12">
-
                             <StackPanel Orientation="Horizontal" 
                                         Spacing="5"
                                         Padding="0 16 0 0"
@@ -124,19 +127,14 @@
 
                             <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="0 5 0 5 "/>
 
-                            <StackPanel Orientation="Horizontal" Spacing="0" Margin="0,5,0,0"
-                                    HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="0" Margin="0,5,0,0" Padding="24 0 0 0">
                                 <TextBlock Text="比赛" FontWeight="Bold" FontSize="16"/>
-                                <TextBlock Text="进行中" FontWeight="Bold" FontSize="16"/>
+                                <TextBlock Text="进行中，" FontWeight="Bold" FontSize="16"/>
                             </StackPanel>
 
-                            <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,5,0,0" Padding="24 0 0 0">
-                                <TextBlock Text="现在轮到" FontWeight="SemiBold"/>
-                                <TextBlock x:Name="CurrentPlayerText" Text="..."/>
-                                <TextBlock Text="落子，" FontWeight="SemiBold"/>
-                            </StackPanel>
+                            <TextBlock x:Name="IsWatingTip" Text="等待对方落子..." Padding=" 24 5 0 20" Visibility="Visible" FontWeight="SemiBold"/>
 
-                            <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,5,0,0" Padding="24 0 0 0">
+                            <StackPanel x:Name="IsThinkingTip" Orientation="Horizontal" Spacing="5" Padding="24 5 0 20" Visibility="Collapsed">
                                 <TextBlock Text="已思考" FontWeight="SemiBold"/>
                                 <TextBlock x:Name="ThinkingTime" Text="0" FontWeight="SemiBold"/>
                                 <TextBlock Text="秒。" FontWeight="SemiBold"/>
@@ -149,11 +147,11 @@
                             CornerRadius="8"
                             BorderThickness="1"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                            Margin="0 0 0 24"
                             Width="300"
-                            Height="300"
                             Visibility="Visible"
-                            x:Name="HistoryCard">
+                            x:Name="HistoryCard"
+                            Grid.Row="1"
+                            Margin="0 20 0 20">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -172,7 +170,7 @@
                                 <ListView.ItemTemplate>
                                     <DataTemplate x:DataType="models:Move">
                                         <StackPanel Orientation="Horizontal" Spacing="5">
-                                            <TextBlock Text="{x:Bind Id}" Margin="0,0,5,0" Foreground="DarkGray"/>
+                                            <TextBlock Text="{x:Bind Id}" Margin="0,0,5,0" Foreground="DarkGray" FontFamily="Cascadia Mono"/>
                                             <TextBlock Text="{x:Bind player}"/>
                                             <TextBlock Text="{x:Bind message}"/>
                                         </StackPanel>
@@ -187,14 +185,14 @@
                             BorderThickness="1"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             Width="300"
-                            Height="116">
+                            Grid.Row="2">
                         <StackPanel Orientation="Vertical" Spacing="12">
                             <TextBlock Grid.Row="0" Text="操作" HorizontalAlignment="Center" FontWeight="Bold" FontSize="16" Padding="0 16 0 0"/>
 
                             <Border Grid.Row="1" Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="0 5 0 0 "/>
 
                             <StackPanel Orientation="Horizontal"
-                                        Spacing="12"
+                                        Spacing="36"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center">
                                 <Button x:Name="CaptureButton" 
@@ -205,14 +203,15 @@
                                 Content="悔棋" 
                                 Click="UndoButton_Click"/>
 
-                                <Button x:Name="MakeMoveButton" 
-                                Content="继续落子"
-                                Click="MakeMoveButton_Click" 
-                                Style="{ThemeResource AccentButtonStyle}"/>
+                                <Button x:Name="MakeMoveButton"
+                                        Content="落子"
+                                        Click="MakeMoveButton_Click"
+                                        Style="{ThemeResource AccentButtonStyle}"/>
                             </StackPanel>
+                            <ProgressBar x:Name="ThinkingProgressBar" IsIndeterminate="True" ShowPaused="False" ShowError="False" Visibility="Collapsed" />
                         </StackPanel>
                     </Border>
-                </StackPanel>
+                </Grid>
             </Grid>
         </Grid>
     </Grid>

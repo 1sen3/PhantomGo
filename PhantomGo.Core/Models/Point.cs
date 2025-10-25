@@ -53,7 +53,7 @@ namespace PhantomGo.Core.Models
         public override string ToString()
         {
             char symbol = (char)('A' + X - 1);
-            return $"{symbol}{Y}";
+            return $"{symbol}{10 - Y}";
         }
         /// <summary>
         /// 将棋局上的坐标 (A1) 转换为坐标点 (x, y)
@@ -86,6 +86,10 @@ namespace PhantomGo.Core.Models
         public static Point Quit()
         {
             return new Point(0, 2);
+        }
+        public static Point Unlegal()
+        {
+            return new Point(10, 10);
         }
     }
 }

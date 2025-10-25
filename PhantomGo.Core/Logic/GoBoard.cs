@@ -198,6 +198,37 @@ namespace PhantomGo.Core.Logic
         }
 
         #region 辅助方法
+        public PointState IsKoish(Point point)
+        {
+            if (GetPointState(point) != PointState.None) return PointState.None;
+            var neigborStateSet = new HashSet<PointState>();
+            foreach(var neighbor in GetNeighbors(point))
+            {
+                neigborStateSet.Add(GetPointState(neighbor));
+            }
+            if(neigborStateSet.Count == 1 && !neigborStateSet.Contains(PointState.None))
+            {
+                return neigborStateSet.First();
+            } else
+            {
+                return PointState.None;
+            }
+        }
+        public PointState IsEyeish(Point point)
+        {
+            var color = IsKoish(point);
+            if (color == PointState.None) return PointState.None;
+            var diagonalFaults = 0;
+            var diagonals = GetDiagonals(point);
+            if (diagonals.Count < 4) diagonalFaults += 1;
+            foreach(var diag in diagonals)
+            {
+                var diagState = GetPointState(diag);
+                if (diagState != color && diagState != PointState.None) diagonalFaults += 1;
+            }
+            if (diagonalFaults > 1) return PointState.None;
+            else return color;
+        }
         public bool IsValidMove(Point point, Player player)
         {
             if(!IsOnBoard(point) || GetPointState(point) != PointState.None || (_koPoint.HasValue && _koPoint.Value.Equals(point))) {
@@ -237,6 +268,11 @@ namespace PhantomGo.Core.Logic
         {
             return point.X <= Size && point.X > 0 &&
                    point.Y <= Size && point.Y > 0;
+        }
+        public void SetState(Point point, Player color)
+        {
+            if (color == Player.Black) _board[point.X, point.Y] = PointState.black;
+            else _board[point.X, point.Y] = PointState.white;
         }
 
         public List<Point> GetNeighbors(Point point)

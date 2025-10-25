@@ -40,6 +40,9 @@ namespace PhantomGo
         private Player _currentPlayer;
         private IPlayerAgent _agent;
         private string _teamName;
+        private List<PlayerKnowledge> _knowledgeHistory = new List<PlayerKnowledge>();
+        private bool _isThinking = false;
+        private double _thinkingTime = 0;
 
         // Win2D 棋盘布局参数
         private float _gridSpacing;
@@ -82,6 +85,8 @@ namespace PhantomGo
             
             // 启动计时器
             _timerService.StartTimer();
+
+            SaveCurrentKnowledge();
         }
 
         #region Event Handlers
@@ -118,15 +123,182 @@ namespace PhantomGo
 
         private async void UndoButton_Click(object sender, RoutedEventArgs e)
         {
+            if(MoveHistory.Count <= 0)
+            {
+                await new ContentDialog
+                {
+                    Title = "悔棋失败",
+                    Content = "历史记录为空，无法悔棋",
+                    DefaultButton = ContentDialogButton.Primary,
+                    PrimaryButtonText = "好",
+                    XamlRoot = this.Content.XamlRoot,
+                }.ShowAsync();
+                return;
+            }
+            var undoComboBox = new ComboBox
+            {
+                ItemsSource = MoveHistory,
+                DisplayMemberPath = "idAndMessage",
+                SelectedIndex = 0,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+            var undoStackPanel = new StackPanel { Orientation = Orientation.Vertical, Spacing = 12 };
+            undoStackPanel.Children.Add(new TextBlock { Text = "请选择要撤回的落子:" });
+            undoStackPanel.Children.Add(undoComboBox);
+            var undoDialog = new ContentDialog
+            {
+                Title = "悔棋",
+                Content = undoStackPanel,
+                PrimaryButtonText = "确定",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.Content.XamlRoot
+            };
+
+            var result =  await undoDialog.ShowAsync();
+
+            if (result == ContentDialogResult.Primary)
+            { 
+                int selectedIndexInComboBox = undoComboBox.SelectedIndex;
+
+                int knowledgeIndex = _knowledgeHistory.Count - 2 - selectedIndexInComboBox;
+                RestoreKnowledgeState(_knowledgeHistory[knowledgeIndex]);
+
+                int statesToRemove = _knowledgeHistory.Count - (knowledgeIndex + 1);
+                _knowledgeHistory.RemoveRange(knowledgeIndex + 1, statesToRemove);
+
+                for (int i = 0; i <= selectedIndexInComboBox; i++)
+                {
+                    MoveHistory.RemoveAt(0);
+                }
+            }
 
             UpdateBoard();
         }
 
-        private void NewGameButton_Click(object sender, RoutedEventArgs e)
+        private async void CaptureButton_Click(object sender, RoutedEventArgs e)
         {
-            
-            UpdateBoard();
+            var captureStackPanel = new StackPanel { Orientation = Orientation.Vertical, Spacing = 12 };
+            var captureText = new TextBlock { Text = "请输入被提掉子群中的一个子:" };
+            var captureInput = new TextBox { PlaceholderText = "例:A1" };
+            captureStackPanel.Children.Add(captureText);
+            captureStackPanel.Children.Add(captureInput);
+
+            var captureDialog = new ContentDialog
+            {
+                Title = "提子",
+                Content = captureStackPanel,
+                PrimaryButtonText = "确定",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.Content.XamlRoot
+            };
+
+            var result = await captureDialog.ShowAsync();
+            if (result == ContentDialogResult.Primary)
+            {
+                string input = captureInput.Text.Trim();
+                char[] delimeters = new char[] { ' ', ',', '，', '、' };
+
+                bool parseSuccess = true;
+                var points = new List<Point>();
+                foreach (var coord in input.Split(delimeters))
+                {
+                    try
+                    {
+                        var point = Point.TransInputToPoint(coord);
+                        points.Add(point);
+                    }
+                    catch (ArgumentException)
+                    {
+                        parseSuccess = false;
+                        _ = new MessageDialog($"提子失败，无法识别坐标").ShowAsync();
+                    }
+                }
+
+                if (parseSuccess)
+                {
+                    _agent.OnPointCaptured(points);
+                    UpdateBoard();
+                }
+            }
+
+            _knowledgeHistory[_knowledgeHistory.Count - 1] = _agent.Knowledge.Clone(); // 提子后覆盖最新的回放点知识
         }
+
+        private async void MakeMoveButton_Click(object sender, RoutedEventArgs e)
+        {
+            IsThinkingTip.Visibility = Visibility.Visible;
+            IsWatingTip.Visibility = Visibility.Collapsed;
+
+            _timerService.RestartTimer();
+
+            bool isMoveSuccess = false;
+
+            try
+            {
+                _isThinking = true;
+                OnThinkingStateChanged();
+                var moveResult = await Task.Run(() => _agent.GenerateMove());
+                var move = moveResult.Item2;
+                var time = moveResult.Item1;
+                _thinkingTime += time;
+
+                _timerService.StopTimer();
+
+                if (move.Equals(Point.Pass()))
+                {
+                    var PassDialog = new ContentDialog
+                    {
+                        Title = "Pass",
+                        Content = "AI 选择了 PASS",
+                        IsPrimaryButtonEnabled = false,
+                        CloseButtonText = "好",
+                        XamlRoot = this.Content.XamlRoot
+                    }.ShowAsync();
+                }
+                else
+                {
+                    var JudgeDialog = new ContentDialog
+                    {
+                        Title = "落子",
+                        Content = $"AI 选择在 {move} 处落子，是否合法？",
+                        PrimaryButtonText = "是",
+                        CloseButtonText = "否",
+                        DefaultButton = ContentDialogButton.Primary,
+                        XamlRoot = this.Content.XamlRoot
+                    };
+                    var result = await JudgeDialog.ShowAsync();
+                    if (result == ContentDialogResult.Primary)
+                    {
+                        isMoveSuccess = true;
+                        _agent.Knowledge.MakeMove(move);
+                        MoveHistory.Insert(0, new Move { Id = MoveHistory.Count + 1, message = $"思考 {_thinkingTime:F2}s 后在 {move} 处落子" });
+                        _thinkingTime = 0;
+                        SaveCurrentKnowledge();
+                        _agent.OnMoveSuccess();
+                    }
+                    else
+                    {
+                        _agent.OnMoveFailed();
+                    }
+                }
+
+                UpdateBoard();
+            }
+            finally
+            {
+                _isThinking = false;
+                IsWatingTip.Visibility = Visibility.Visible;
+                IsThinkingTip.Visibility = Visibility.Collapsed;
+                OnThinkingStateChanged();
+
+                if (!isMoveSuccess)
+                {
+                    MakeMoveButton_Click(sender, e);
+                }
+            }
+        }
+
 
         #endregion
 
@@ -143,10 +315,6 @@ namespace PhantomGo
         private void UpdateThinkingTime(int seconds)
         {
             ThinkingTime.Text = seconds.ToString();
-        }
-        private void UpdateCurrentPlayer(string playerName)
-        {
-            CurrentPlayerText.Text = playerName;
         }
         #endregion
 
@@ -182,7 +350,7 @@ namespace PhantomGo
                 ds.DrawText(colChar.ToString(), xPos, _canvasRenderSize - LabelMargin / 2, Colors.Gray, _labelTextFormat);
 
                 // 绘制行号 (1-9)
-                var rowNum = (i + 1).ToString(); // 围棋习惯，1在下方
+                var rowNum = (9 - i).ToString(); // 围棋习惯，1在下方
                 float yPos = gridOffset + i * _gridSpacing;
                 // 左侧
                 ds.DrawText(rowNum, LabelMargin / 2, yPos, Colors.Gray, _labelTextFormat);
@@ -280,27 +448,6 @@ namespace PhantomGo
                 gridOffset + (logicalPoint.Y - 1) * _gridSpacing
             );
         }
-
-        private Point ScreenToLogical(Vector2 screenPoint)
-        {
-            // 转换时需要减去标签边距和半格偏移
-            float gridOffset = LabelMargin + (_gridSpacing / 2);
-            // 检查点击是否在棋盘网格区域内
-            if (screenPoint.X < LabelMargin || screenPoint.X > _canvasRenderSize - LabelMargin ||
-                screenPoint.Y < LabelMargin || screenPoint.Y > _canvasRenderSize - LabelMargin)
-            {
-                return new Point(0, 0); // 点击在边距上，无效
-            }
-
-            int x = (int)Math.Round((screenPoint.X - gridOffset) / _gridSpacing) + 1;
-            int y = (int)Math.Round((screenPoint.Y - gridOffset) / _gridSpacing) + 1;
-
-            // 检查边界
-            if (x < 1 || x > _boardSize || y < 1 || y > _boardSize)
-                return new Point(0, 0);
-
-            return new Point(x, y);
-        }
         #endregion
 
         private void BoardSegmented_Initialize(bool isFirst)
@@ -319,98 +466,30 @@ namespace PhantomGo
             }
         }
 
-        private async void CaptureButton_Click(object sender, RoutedEventArgs e)
+        #region 回放辅助方法
+        private void SaveCurrentKnowledge()
         {
-            var captureStackPanel = new StackPanel { Orientation = Orientation.Vertical, Spacing = 12 };
-            var captureText = new TextBlock { Text = "请输入被提掉的子" };
-            var captureInput = new TextBox { PlaceholderText = "例:A1、A2···" };
-            captureStackPanel.Children.Add(captureText);
-            captureStackPanel.Children.Add(captureInput);
-
-            var captureDialog = new ContentDialog
-            {
-                Title = "提子",
-                Content = captureStackPanel,
-                PrimaryButtonText = "确定",
-                DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = this.Content.XamlRoot
-            };
-
-            var result = await captureDialog.ShowAsync();
-            if(result == ContentDialogResult.Primary)
-            {
-                string input = captureInput.Text.Trim();
-                var points = new List<Point>();
-                char[] delimiters = { ',', '、', ' ' };
-                string[] coordinates = input.Split(delimiters, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray();
-
-                bool parseSuccess = true;
-
-                foreach(var coord in coordinates)
-                {
-                    try
-                    {
-                        Point p = Point.TransInputToPoint(coord);
-                        points.Add(p);
-                    }
-                    catch(ArgumentException)
-                    {
-                        parseSuccess = false;
-                        new MessageDialog($"提子失败，无法识别坐标").ShowAsync();
-                        break;
-                    }
-                }
-                if(parseSuccess)
-                {
-                    _agent.Knowledge.OnPointCaptured(points);
-                    UpdateBoard();
-                }
-            }
+            _knowledgeHistory.Add(_agent.Knowledge.Clone());
         }
-
-        private async void MakeMoveButton_Click(object sender, RoutedEventArgs e)
+        private void RestoreKnowledgeState(PlayerKnowledge stateToRestore)
         {
-            _timerService.RestartTimer();
-
-            var move = _agent.GenerateMove();
-
-            if(move.Equals(Point.Pass()))
+            _agent.Knowledge = stateToRestore.Clone();
+        }
+        public bool InvertBoolean(bool value) { return !value; }
+        public void OnThinkingStateChanged()
+        {
+            if (_isThinking)
             {
-                var PassDialog = new ContentDialog
-                {
-                    Title = "Pass",
-                    Content = "AI 选择了 PASS",
-                    IsPrimaryButtonEnabled = false,
-                    CloseButtonText = "好",
-                    XamlRoot = this.Content.XamlRoot
-                }.ShowAsync();
+                MakeMoveButton.IsEnabled = false;
+                ThinkingProgressBar.Visibility = Visibility.Visible;
+                ThinkingProgressBar.ShowPaused = false;
             } else
             {
-                var JudgeDialog = new ContentDialog
-                {
-                    Title = "落子",
-                    Content = $"AI 选择在 {move} 处落子，是否合法？",
-                    PrimaryButtonText = "是",
-                    CloseButtonText = "否",
-                    XamlRoot = this.Content.XamlRoot
-                };
-                var result = await JudgeDialog.ShowAsync();
-                if(result == ContentDialogResult.Primary)
-                {
-                    MakeMove(move);
-                } else
-                {
-                    _agent.Knowledge.MarkAsInferred(move);
-                }
+                MakeMoveButton.IsEnabled = true;
+                ThinkingProgressBar.Visibility = Visibility.Collapsed;
+                ThinkingProgressBar.ShowPaused = true;
             }
-
-            UpdateBoard();
         }
-
-        private void MakeMove(Point point)
-        {
-            _agent.Knowledge.AddOwnState(point);
-            MoveHistory.Insert(0, new Move { Id = MoveHistory.Count + 1, message = $"{_teamName}在 {point} 处落子"});
-        }
+        #endregion
     }
 }

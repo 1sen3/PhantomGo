@@ -14,11 +14,11 @@ namespace PhantomGo.Core.Agents
     /// </summary>
     public interface IPlayerAgent
     {
-        int MoveCount { get; set; }
+        Dictionary<Player, int> MoveCount { get; set; }
         /// <summary>
         /// 玩家的棋局知识库
         /// </summary>
-        PlayerKnowledge Knowledge { get; }
+        PlayerKnowledge Knowledge { get; set; }
         /// <summary>
         /// 玩家的棋子颜色
         /// </summary>
@@ -26,7 +26,7 @@ namespace PhantomGo.Core.Agents
         /// <summary>
         /// 生成一个落子点
         /// </summary>
-        Point GenerateMove();
+        (double, Point) GenerateMove();
         /// <summary>
         /// 根据裁判返回的信息，更新记忆（新版）
         /// </summary>
@@ -85,9 +85,8 @@ namespace PhantomGo.Core.Agents
                 }
             }
         }
-        void OnMoveSuccess()
-        {
-            MoveCount++;
-        }
+        void OnMoveSuccess();
+        void OnMoveFailed();
+        void OnPointCaptured(List<Point> capturedPoints);
     }
 }

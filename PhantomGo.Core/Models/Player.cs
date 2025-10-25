@@ -33,6 +33,9 @@ namespace PhantomGo.Core.Models
         {
             return player == Player.Black ? Player.White : Player.Black;
         }
+        /// <summary>
+        /// 比较棋子颜色与玩家颜色是否一致
+        /// </summary>
         public static bool CompareToPointState(this Player player, PointState pointState)
         {
             if(pointState == PointState.black && player == Player.Black ||

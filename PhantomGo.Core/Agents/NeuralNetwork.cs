@@ -53,39 +53,28 @@ namespace PhantomGo.Core.Agents
             const int historyLength = 8;
             var tensorData = new DenseTensor<float>(new[] { 1, boardSize, boardSize, numChannels });
 
-            var historyQueue = knowledge.GetHistory();
-            var historyList = historyQueue.Reverse().ToList();
-            while(historyList.Count < historyLength)
+            int playerChannel = 0, opponentChannel = 1;
+            
+            for(int y = 1;y <= boardSize;++y)
             {
-                historyList.Add(new MemoryPointState[boardSize + 1, boardSize + 1]);
-            }
-
-            for(int i = 0;i < historyLength;++i)
-            {
-                MemoryPointState[,] memoryState = historyList[i];
-
-                int myChannel = i * 2, opponentChannel = i * 2 + 1;
-                
-                for(int y = 1;y <= boardSize;++y)
+                for(int x = 1;x <= boardSize;++x)
                 {
-                    for(int x = 1;x <= boardSize;++x)
+                    var point = new Point(x, y);
+                    var state = knowledge.GetMemoryState(point);
+                    if(state == MemoryPointState.Self)
                     {
-                        var state = memoryState[y, x];
-                        if(state == MemoryPointState.Self)
-                        {
-                            tensorData[0, y - 1, x - 1, myChannel] = 1f;
-                        } else if(state == MemoryPointState.InferredOpponent)
-                        {
-                            tensorData[0, y - 1, x - 1, opponentChannel] = 1f;
-                        }
+                        tensorData[0, y - 1, x - 1, playerChannel] = 1.0f;
+                    } else if(state == MemoryPointState.InferredOpponent)
+                    {
+                        tensorData[0, y - 1, x - 1, opponentChannel] = 1.0f;
                     }
                 }
             }
 
             float playerToMove = (player == Player.Black) ? 1.0f : 0.0f;
-            for(int y = 0;y < boardSize;++y)
+            for(int y = 0;y < boardSize; ++y)
             {
-                for(int x = 0; x < boardSize;++x)
+                for(int x = 1;x < boardSize; ++x)
                 {
                     tensorData[0, y, x, 16] = playerToMove;
                 }
