@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -28,6 +29,10 @@ namespace PhantomGo
     /// </summary>
     public partial class App : Application
     {
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool AllocConsole();
+
         private Window? _window;
         private SgfGenerator _sgfGenerator;
 
@@ -37,6 +42,10 @@ namespace PhantomGo
         /// </summary>
         public App()
         {
+            // 创建控制台用于调试
+            AllocConsole();
+            Console.Title = "PhantomGo Debug Console";
+
             InitializeComponent();
         }
 

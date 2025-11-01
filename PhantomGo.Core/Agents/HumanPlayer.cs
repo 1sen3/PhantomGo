@@ -14,10 +14,10 @@ namespace PhantomGo.Core.Agents
     {
         public Dictionary<Player, int> MoveCount { get; set; }
         public PlayerKnowledge Knowledge { get; set; }
-        public Player PlayerColor { get; }
-        public HumanPlayer(int boardSize, Player playerColor)
+        public Player PlayerColor { get; set; }
+        public HumanPlayer(Player playerColor)
         {
-            Knowledge = new PlayerKnowledge(boardSize, playerColor);
+            Knowledge = new PlayerKnowledge(playerColor);
             PlayerColor = playerColor;
         }
         public (double, Point) GenerateMove()
@@ -33,6 +33,10 @@ namespace PhantomGo.Core.Agents
             return;
         }
         public void OnMoveFailed()
+        {
+            return;
+        }
+        public void MakeMove(Point point)
         {
             return;
         }

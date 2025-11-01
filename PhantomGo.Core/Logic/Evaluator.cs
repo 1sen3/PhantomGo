@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace PhantomGo.Core.Logic
 {
     /// <summary>
-    /// 评估棋面价值的评估器
+    /// 评估棋面价值
     /// </summary>
     public class Evaluator
     {
@@ -41,31 +41,31 @@ namespace PhantomGo.Core.Logic
             var playerColor = player == Player.Black ? PointState.black : PointState.white;
             var opponentColor = player == Player.Black ? PointState.white : PointState.black;
 
-            for(int x = 1;x <= board.Size;++x)
+            for(int row = 1; row <= board.Size; ++row)
             {
-                for(int y = 1;y <= board.Size;++y)
+                for(int col = 1; col <= board.Size; ++col)
                 {
-                    if(board.GetPointState(new Point(x, y)) == PointState.None && !visited[x, y]) {
+                    if(board.GetPointState(new Point(row, col)) == PointState.None && !visited[row, col]) {
                         var area = new List<Point>();
                         bool touchesPlayer = false;
                         bool touchesOpponent = false;
                         var que = new Queue<Point>();
 
-                        que.Enqueue(new Point(x, y));
-                        visited[x, y] = true;
+                        que.Enqueue(new Point(row, col));
+                        visited[row, col] = true;
 
                         while(que.Any())
                         {
                             var current = que.Dequeue();
                             area.Add(current);
-                            foreach(var neighbor in board.GetNeighbors(current))
+                            foreach(var neighbor in GoBoard.GetNeighbors(current))
                             {
                                 var neighborState = board.GetPointState(neighbor);
                                 if (neighborState == PointState.None)
                                 {
-                                    if (!visited[neighbor.X, neighbor.Y])
+                                    if (!visited[neighbor.Row, neighbor.Col])
                                     {
-                                        visited[neighbor.X, neighbor.Y] = true;
+                                        visited[neighbor.Row, neighbor.Col] = true;
                                         que.Enqueue(neighbor);
                                     }
                                 }
@@ -89,15 +89,15 @@ namespace PhantomGo.Core.Logic
             var playerColor = player == Player.Black ? PointState.black : PointState.white;
             var opponentColor = player == Player.Black ? PointState.white : PointState.black;
 
-            for (int x = 1;x <= board.Size;++x)
+            for (int row = 1; row <= board.Size; ++row)
             {
-                for(int y = 1;y <= board.Size;++y)
+                for(int col = 1; col <= board.Size; ++col)
                 {
-                    var point = new Point(x, y);
+                    var point = new Point(row, col);
                     if(board.GetPointState(point) == PointState.None) {
                         int myPoints = 0;
                         var oppoPoints = new List<Point>();
-                        foreach(var neighbor in board.GetNeighbors(point))
+                        foreach(var neighbor in GoBoard.GetNeighbors(point))
                         {
                             var neighborState = board.GetPointState(neighbor);
                             if (neighborState == playerColor) myPoints++;
@@ -133,7 +133,7 @@ namespace PhantomGo.Core.Logic
         /// </summary>
         private int GetRequiredPointsForEye(GoBoard board, Point point)
         {
-            int neighborsCount = board.GetNeighbors(point).Count();
+            int neighborsCount = GoBoard.GetNeighbors(point).Count();
             if (neighborsCount == 2) return 2;
             else if (neighborsCount == 3) return 3;
             else if (neighborsCount == 4) return 4;
@@ -147,21 +147,21 @@ namespace PhantomGo.Core.Logic
             double connectivityScore = 0;
             var playerColor = player == Player.Black ? PointState.black : PointState.white;
 
-            for(int x = 1;x <= board.Size;++x)
+            for(int row = 1; row <= board.Size; ++row)
             {
-                for(int y = 1;y <= board.Size;++y)
+                for(int col = 1; col <= board.Size; ++col)
                 {
-                    var point = new Point(x, y);
+                    var point = new Point(row, col);
                     if (board.GetPointState(point) == playerColor)
                     {
-                        foreach (var neighbor in board.GetNeighbors(point))
+                        foreach (var neighbor in GoBoard.GetNeighbors(point))
                         {
                             if (board.GetPointState(neighbor) == playerColor)
                             {
                                 connectivityScore += 0.25;
                             }
                         }
-                        foreach(var diagonal in board.GetDiagonals(point))
+                        foreach(var diagonal in GoBoard.GetDiagonals(point))
                         {
                             if(board.GetPointState(diagonal) == playerColor)
                             {

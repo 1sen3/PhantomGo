@@ -128,7 +128,7 @@ namespace PhantomGo
             var point = e.GetCurrentPoint(GameBoardCanvas).Position;
             var logicalPoint = ScreenToLogical(new Vector2((float)point.X, (float)point.Y));
 
-            if (logicalPoint.X > 0)
+            if (logicalPoint.Row > 0)
             {
                 try
                 {
@@ -381,17 +381,17 @@ namespace PhantomGo
 
         private Vector2 LogicalToScreen(Point logicalPoint)
         {
-            // [修改] 转换时需要加上标签边距和半格偏移
+            // 转换时需要加上标签边距和半格偏移
             float gridOffset = LabelMargin + (_gridSpacing / 2);
             return new Vector2(
-                gridOffset + (logicalPoint.X - 1) * _gridSpacing,
-                gridOffset + (logicalPoint.Y - 1) * _gridSpacing
+                gridOffset + (logicalPoint.Col - 1) * _gridSpacing,
+                gridOffset + (logicalPoint.Row - 1) * _gridSpacing
             );
         }
 
         private Point ScreenToLogical(Vector2 screenPoint)
         {
-            // [修改] 转换时需要减去标签边距和半格偏移
+            // 转换时需要减去标签边距和半格偏移
             float gridOffset = LabelMargin + (_gridSpacing / 2);
             // 检查点击是否在棋盘网格区域内
             if (screenPoint.X < LabelMargin || screenPoint.X > _canvasRenderSize - LabelMargin ||
@@ -400,14 +400,14 @@ namespace PhantomGo
                 return new Point(0, 0); // 点击在边距上，无效
             }
 
-            int x = (int)Math.Round((screenPoint.X - gridOffset) / _gridSpacing) + 1;
-            int y = (int)Math.Round((screenPoint.Y - gridOffset) / _gridSpacing) + 1;
+            int col = (int)Math.Round((screenPoint.X - gridOffset) / _gridSpacing) + 1;
+            int row = (int)Math.Round((screenPoint.Y - gridOffset) / _gridSpacing) + 1;
 
             // 检查边界
-            if (x < 1 || x > _boardSize || y < 1 || y > _boardSize)
-                return new Point(0, 0);
+            if (col < 1 || col > _boardSize || row < 1 || row > _boardSize)
+                return new PhantomGo.Core.Models.Point(0, 0);
 
-            return new Point(x, y);
+            return new PhantomGo.Core.Models.Point(row, col);
         }
 
         private void GameBoardCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
@@ -428,7 +428,7 @@ namespace PhantomGo
             Point? newHoverPoint = null;
             var view = _gameLogicService.GetPhantomGoView(CurrentPlayer);
             // 检查转换后的点是否在棋盘内，并且该位置是空的
-            if (logicalPoint.X > 0 && view.GetPointState(logicalPoint) == PointState.None)
+            if (logicalPoint.Row > 0 && view.GetPointState(logicalPoint) == PointState.None)
             {
                 newHoverPoint = logicalPoint;
             }

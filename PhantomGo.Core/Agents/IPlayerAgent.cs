@@ -22,7 +22,7 @@ namespace PhantomGo.Core.Agents
         /// <summary>
         /// 玩家的棋子颜色
         /// </summary>
-        Player PlayerColor { get; }
+        Player PlayerColor { get; set; }
         /// <summary>
         /// 生成一个落子点
         /// </summary>
@@ -85,6 +85,7 @@ namespace PhantomGo.Core.Agents
                 }
             }
         }
+        void MakeMove(Point point);
         void OnMoveSuccess();
         void OnMoveFailed();
         void OnPointCaptured(List<Point> capturedPoints);

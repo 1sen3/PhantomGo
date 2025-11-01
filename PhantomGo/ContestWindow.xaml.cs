@@ -89,6 +89,15 @@ namespace PhantomGo
             SaveCurrentKnowledge();
         }
 
+        private void InitializeLogic(bool isFirst)
+        {
+            BoardSegmented_Initialize(isFirst);
+            _currentPlayer = isFirst ? Player.Black : Player.White;
+            MoveHistory.Clear();
+            _knowledgeHistory.Clear();
+            _agent = new AIPlayer(_currentPlayer);
+            UpdateBoard();
+        }
         #region Event Handlers
         public event PropertyChangedEventHandler PropertyChanged;
         private void NotifyPropertyChanged([CallerMemberName] string propertyName = null)
@@ -254,7 +263,9 @@ namespace PhantomGo
                         IsPrimaryButtonEnabled = false,
                         CloseButtonText = "好",
                         XamlRoot = this.Content.XamlRoot
-                    }.ShowAsync();
+                    };
+                    _ = await PassDialog.ShowAsync();
+                    isMoveSuccess = true;
                 }
                 else
                 {
@@ -271,7 +282,7 @@ namespace PhantomGo
                     if (result == ContentDialogResult.Primary)
                     {
                         isMoveSuccess = true;
-                        _agent.Knowledge.MakeMove(move);
+                        _agent.MakeMove(move);
                         MoveHistory.Insert(0, new Move { Id = MoveHistory.Count + 1, message = $"思考 {_thinkingTime:F2}s 后在 {move} 处落子" });
                         _thinkingTime = 0;
                         SaveCurrentKnowledge();
@@ -444,8 +455,8 @@ namespace PhantomGo
             // 转换时需要加上标签边距和半格偏移
             float gridOffset = LabelMargin + (_gridSpacing / 2);
             return new Vector2(
-                gridOffset + (logicalPoint.X - 1) * _gridSpacing,
-                gridOffset + (logicalPoint.Y - 1) * _gridSpacing
+                gridOffset + (logicalPoint.Col - 1) * _gridSpacing,
+                gridOffset + (logicalPoint.Row - 1) * _gridSpacing
             );
         }
         #endregion
@@ -491,5 +502,21 @@ namespace PhantomGo
             }
         }
         #endregion
+
+        private async void Reset_Click(object sender, RoutedEventArgs e)
+        {
+            var isBlackDialog = new ContentDialog
+            {
+                Title = "重置",
+                Content = "是否为先手？",
+                PrimaryButtonText = "是",
+                CloseButtonText = "否",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.Content.XamlRoot
+            };
+            var result = await isBlackDialog.ShowAsync();
+            bool isFirst = result == ContentDialogResult.Primary;
+            InitializeLogic(isFirst);
+        }
     }
 }

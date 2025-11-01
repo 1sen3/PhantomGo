@@ -35,7 +35,7 @@ namespace PhantomGo.Core.Agents
 
         public (float[] Policy, float Value) Predict(PlayerKnowledge knowledge, Player player)
         {
-            var inputTensor = BoardToTensor(knowledge, player);
+            var inputTensor = KnowledgeToTensor(knowledge, player);
             var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(_inputName, inputTensor) };
 
             using var results = _session.Run(inputs);
@@ -46,37 +46,109 @@ namespace PhantomGo.Core.Agents
             return (policyTensor.ToArray(), valueTensor[0]);
         }
 
-        private DenseTensor<float> BoardToTensor(PlayerKnowledge knowledge, Player player)
+        /// <summary>
+        /// 使用棋盘进行预测
+        /// </summary>
+        public (float[] Policy, float Value) Predict(GoBoard board, Player player)
+        {
+            var inputTensor = BoardToTensor(board, player);
+            var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(_inputName, inputTensor) };
+
+            using var results = _session.Run(inputs);
+
+            var policyTensor = results.First(r => r.Name == _policyOutputName).AsTensor<float>();
+            var valueTensor = results.First(r => r.Name == _valueOutputName).AsTensor<float>();
+
+
+            return (policyTensor.ToArray(), valueTensor[0]);
+        }
+
+        private DenseTensor<float> KnowledgeToTensor(PlayerKnowledge knowledge, Player player)
         {
             const int numChannels = 17;
             const int boardSize = 9;
             const int historyLength = 8;
             var tensorData = new DenseTensor<float>(new[] { 1, boardSize, boardSize, numChannels });
 
-            int playerChannel = 0, opponentChannel = 1;
-            
-            for(int y = 1;y <= boardSize;++y)
+            int playerChannel = 0, opponentChannel = 1, koChannel = 2;
+
+            for(int row = 1; row <= boardSize; ++row)
             {
-                for(int x = 1;x <= boardSize;++x)
+                for(int col = 1; col <= boardSize; ++col)
                 {
-                    var point = new Point(x, y);
+                    var point = new Point(row, col);  // Point(row, col)
                     var state = knowledge.GetMemoryState(point);
-                    if(state == MemoryPointState.Self)
+                    if (state == MemoryPointState.Self)
                     {
-                        tensorData[0, y - 1, x - 1, playerChannel] = 1.0f;
-                    } else if(state == MemoryPointState.InferredOpponent)
+                        tensorData[0, row - 1, col - 1, playerChannel] = 1.0f;
+                    }
+                    else if (state == MemoryPointState.InferredOpponent)
                     {
-                        tensorData[0, y - 1, x - 1, opponentChannel] = 1.0f;
+                        tensorData[0, row - 1, col - 1, opponentChannel] = 1.0f;
+                    }
+                    else if (state == MemoryPointState.KoBlocked) {
+                        tensorData[0, row - 1, col - 1, koChannel] = 1.0f;
                     }
                 }
             }
 
             float playerToMove = (player == Player.Black) ? 1.0f : 0.0f;
-            for(int y = 0;y < boardSize; ++y)
+            for(int row = 0; row < boardSize; ++row)
             {
-                for(int x = 1;x < boardSize; ++x)
+                for(int col = 0; col < boardSize; ++col)
                 {
-                    tensorData[0, y, x, 16] = playerToMove;
+                    tensorData[0, row, col, 16] = playerToMove;
+                }
+            }
+
+            return tensorData;
+        }
+
+        private DenseTensor<float> BoardToTensor(GoBoard board, Player player)
+        {
+            const int numChannels = 17;
+            const int boardSize = 9;
+            const int historyLength = 8;
+            var tensorData = new DenseTensor<float>(new[] { 1, boardSize, boardSize, numChannels });
+
+            // 获取历史棋盘状态
+            var history = board.GetBoardHistory(historyLength);
+
+            // 填充16个历史通道
+            for (int t = 0; t < historyLength; t++)
+            {
+                var historicalBoard = history[t];
+
+                for (int row = 1; row <= boardSize; row++)
+                {
+                    for (int col = 1; col <= boardSize; col++)
+                    {
+                        var state = historicalBoard[row, col];
+
+                        // 偶数通道：当前行棋方的棋子
+                        if ((player == Player.Black && state == PointState.black) ||
+                            (player == Player.White && state == PointState.white))
+                        {
+                            tensorData[0, row - 1, col - 1, t * 2] = 1.0f;
+                        }
+
+                        // 奇数通道：对手的棋子
+                        if ((player == Player.Black && state == PointState.white) ||
+                            (player == Player.White && state == PointState.black))
+                        {
+                            tensorData[0, row - 1, col - 1, t * 2 + 1] = 1.0f;
+                        }
+                    }
+                }
+            }
+
+            // 通道 16：当前行棋方颜色
+            float playerToMove = (player == Player.Black) ? 1.0f : 0.0f;
+            for (int row = 0; row < boardSize; row++)
+            {
+                for (int col = 0; col < boardSize; col++)
+                {
+                    tensorData[0, row, col, 16] = playerToMove;
                 }
             }
 

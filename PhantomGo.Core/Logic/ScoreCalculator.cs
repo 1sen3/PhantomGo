@@ -25,24 +25,24 @@ namespace PhantomGo.Core.Logic
         {
             double blackScore = 0;
             double whiteScore = 0;
-            for(int x = 1;x <= _board.Size;++x)
+            for(int row = 1; row <= _board.Size; ++row)
             {
-                for (int y = 1; y <= _board.Size; ++y)
+                for (int col = 1; col <= _board.Size; ++col)
                 {
-                    var color = _board.GetPointState(new Point(x, y));
+                    var color = _board.GetPointState(new Point(row, col));
                     if (color == PointState.white)
                     {
                         whiteScore++;
-                        _visited[x, y] = true;
+                        _visited[row, col] = true;
                     }
                     else if (color == PointState.black)
                     {
                         blackScore++;
-                        _visited[x, y] = true;
+                        _visited[row, col] = true;
                     }
                     else
                     {
-                        var (region, borderColors) = FindEmptyRegion(new Point(x, y));
+                        var (region, borderColors) = FindEmptyRegion(new Point(row, col));
                         if (borderColors.Count == 1)
                         {
                             if (borderColors.Contains(PointState.black))
@@ -66,24 +66,24 @@ namespace PhantomGo.Core.Logic
             var borderColors = new HashSet<PointState>();
             var queue = new Queue<Point>();
 
-            if (_visited[startPoint.X, startPoint.Y])
+            if (_visited[startPoint.Row, startPoint.Col])
             {
                 return (region, borderColors);
             }
             queue.Enqueue(startPoint);
-            _visited[startPoint.X, startPoint.Y] = true;
+            _visited[startPoint.Row, startPoint.Col] = true;
             while(queue.Count > 0)
             {
                 var current = queue.Dequeue();
                 region.Add(current);
-                foreach (var neighbor in _board.GetNeighbors(current))
+                foreach (var neighbor in GoBoard.GetNeighbors(current))
                 {
                     var neighborState = _board.GetPointState(neighbor);
                     if (neighborState == PointState.None)
                     {
-                        if (!_visited[neighbor.X, neighbor.Y])
+                        if (!_visited[neighbor.Row, neighbor.Col])
                         {
-                            _visited[neighbor.X, neighbor.Y] = true;
+                            _visited[neighbor.Row, neighbor.Col] = true;
                             queue.Enqueue(neighbor);
                         }
                     } else

@@ -28,18 +28,18 @@ namespace PhantomGo.Core.Models
         private MemoryPointState[,] _memeryBoard;
         public int BoardSize { get; }
         public Player PlayerColor { get; }
-        public PlayerKnowledge(int boardSize, Player playerColor)
+        public PlayerKnowledge(Player playerColor)
         {
-            BoardSize = boardSize;
+            BoardSize = 9;
             PlayerColor = playerColor;
-            _memeryBoard = new MemoryPointState[boardSize + 1, boardSize + 1];
+            _memeryBoard = new MemoryPointState[BoardSize + 1, BoardSize + 1];
         }
         /// <summary>
         /// 获取某个点的记忆状态
         /// </summary>
         public MemoryPointState GetMemoryState(Point point)
         {
-            return _memeryBoard[point.X, point.Y];
+            return _memeryBoard[point.Row, point.Col];
         }
         /// <summary>
         /// 落子成功时，更新记忆状态
@@ -47,19 +47,19 @@ namespace PhantomGo.Core.Models
         /// <param name="point"></param>
         public void AddOwnState(Point point)
         {
-            _memeryBoard[point.X, point.Y] = MemoryPointState.Self;
+            _memeryBoard[point.Row, point.Col] = MemoryPointState.Self;
         }
         /// <summary>
         /// 落子失败时，更新记忆状态
         /// </summary>
         public void MarkAsInferred(Point point)
         {
-            _memeryBoard[point.X, point.Y] = MemoryPointState.InferredOpponent;
+            _memeryBoard[point.Row, point.Col] = MemoryPointState.InferredOpponent;
         }
 
         public void MarkAsKoBlocked(Point point)
         {
-            _memeryBoard[point.X, point.Y] = MemoryPointState.KoBlocked;
+            _memeryBoard[point.Row, point.Col] = MemoryPointState.KoBlocked;
         }
         public void OnPointCaptured(IReadOnlyList<Point> capturedPoints)
         {
@@ -70,11 +70,11 @@ namespace PhantomGo.Core.Models
                 RemoveState(point);
                 var neighbors = new List<Point>
                 {
-                    new Point(point.X - 1, point.Y),
-                    new Point(point.X + 1, point.Y),
-                    new Point(point.X, point.Y - 1),
-                    new Point(point.X, point.Y + 1)
-                }.Where(p => p.X >= 1 && p.X <= BoardSize && p.Y >= 1 && p.Y <= BoardSize);
+                    new Point(point.Row - 1, point.Col),
+                    new Point(point.Row + 1, point.Col),
+                    new Point(point.Row, point.Col - 1),
+                    new Point(point.Row, point.Col + 1)
+                }.Where(p => p.Row >= 1 && p.Row <= BoardSize && p.Col >= 1 && p.Col <= BoardSize);
                 foreach(var neighbor in neighbors)
                 {
                     if(GetMemoryState(neighbor) == MemoryPointState.Unknown && !capturedSets.Contains(neighbor))
@@ -85,29 +85,30 @@ namespace PhantomGo.Core.Models
                 }
             }
         }
-        public void MakeMove(Point point)
+        public PlayResult MakeMove(Point point)
         {
             var board = TransMemoryToBoard();
-            board.PlaceStone(point, PlayerColor);
+            var result = board.PlaceStone(point, PlayerColor);
             _memeryBoard = TransBoardToMemory(board);
+            return result;
         }
         /// <summary>
         /// 移除记忆状态
         /// </summary>
         public void RemoveState(Point point)
         {
-            _memeryBoard[point.X, point.Y] = MemoryPointState.Unknown;
+            _memeryBoard[point.Row, point.Col] = MemoryPointState.Unknown;
         }
         /// <summary>
         /// 清空所有记忆
         /// </summary>
         public void Clear()
         {
-            for (int x = 1; x <= BoardSize; x++)
+            for (int row = 1; row <= BoardSize; row++)
             {
-                for (int y = 1; y <= BoardSize; y++)
+                for (int col = 1; col <= BoardSize; col++)
                 {
-                    _memeryBoard[x, y] = MemoryPointState.Unknown;
+                    _memeryBoard[row, col] = MemoryPointState.Unknown;
                 }
             }
         }
@@ -120,11 +121,11 @@ namespace PhantomGo.Core.Models
         {
             GoBoard guessBoard = new GoBoard();
             Player opponentPlayer = currentPlayer.GetOpponent();
-            for(int x = 1;x <= BoardSize;++x)
+            for(int row = 1; row <= BoardSize; ++row)
             {
-                for(int y = 1;y <= BoardSize;++y)
+                for(int col = 1; col <= BoardSize; ++col)
                 {
-                    var point = new Point(x, y);
+                    var point = new Point(row, col);
                     if(GetMemoryState(point) == MemoryPointState.Self)
                     {
                         guessBoard.PlaceStone(point, currentPlayer);
@@ -139,11 +140,11 @@ namespace PhantomGo.Core.Models
         public GoBoard TransMemoryToBoard()
         {
             GoBoard board = new GoBoard();
-            for(int x = 1;x <= BoardSize;++x)
+            for(int row = 1; row <= BoardSize; ++row)
             {
-                for(int y = 1;y <= BoardSize;++y)
+                for(int col = 1; col <= BoardSize; ++col)
                 {
-                    var point = new Point(x, y);
+                    var point = new Point(row, col);
                     if (GetMemoryState(point) == MemoryPointState.Self) board.SetState(point, PlayerColor);
                     else if(GetMemoryState(point) == MemoryPointState.InferredOpponent) board.SetState(point, PlayerColor.GetOpponent());
                 }
@@ -153,22 +154,22 @@ namespace PhantomGo.Core.Models
         public MemoryPointState[,] TransBoardToMemory(GoBoard board)
         {
             var memory = new MemoryPointState[BoardSize + 1, BoardSize + 1];
-            for (int x = 1; x <= BoardSize; ++x)
+            for (int row = 1; row <= BoardSize; ++row)
             {
-                for (int y = 1; y <= BoardSize; ++y)
+                for (int col = 1; col <= BoardSize; ++col)
                 {
-                    var point = new Point(x, y);
+                    var point = new Point(row, col);
                     var pointState = board.GetPointState(point);
                     if (pointState == PointState.None) continue;
-                    else if (PlayerColor.CompareToPointState(pointState)) memory[point.X, point.Y] = MemoryPointState.Self;
-                    else memory[point.X, point.Y] = MemoryPointState.InferredOpponent;
+                    else if (PlayerColor.CompareToPointState(pointState)) memory[point.Row, point.Col] = MemoryPointState.Self;
+                    else memory[point.Row, point.Col] = MemoryPointState.InferredOpponent;
                 }
             }
             return memory;
         }
         public PlayerKnowledge Clone()
         {
-            var newKnowledge = new PlayerKnowledge(BoardSize, PlayerColor);
+            var newKnowledge = new PlayerKnowledge(PlayerColor);
             Array.Copy(this._memeryBoard, newKnowledge._memeryBoard, this._memeryBoard.Length);
             return newKnowledge;
         }

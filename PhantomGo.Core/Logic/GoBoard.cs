@@ -2,6 +2,7 @@
 using PhantomGo.Core.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,8 +22,12 @@ namespace PhantomGo.Core.Logic
         private static readonly ZobristHash _zobrist;
         private readonly HashSet<ulong> _historyHashes; // 检测全局同形
 
-        private readonly Dictionary<Point, List<Point>> NEIGHBORS_CACHE;
-        private readonly Dictionary<Point, List<Point>> DIAGONALS_CACHE;
+        private static Dictionary<Point, List<Point>> NEIGHBORS_CACHE;
+        private static Dictionary<Point, List<Point>> DIAGONALS_CACHE;
+
+        // 历史棋盘状态记录 (用于神经网络特征提取)
+        private readonly List<PointState[,]> _boardHistory;
+        private const int MAX_HISTORY_LENGTH = 8; // 保留最近8步的历史
 
         public GameState GameState { get; set; }
 
@@ -41,6 +46,9 @@ namespace PhantomGo.Core.Logic
             _currentHash = 0;
             _historyHashes = new HashSet<ulong>();
             _historyHashes.Add(_currentHash);
+            _boardHistory = new List<PointState[,]>();
+            // 初始化时添加一个空棋盘作为初始状态
+            _boardHistory.Add(CloneBoardState(_board));
             NEIGHBORS_CACHE = InitializeNeighbors();
             DIAGONALS_CACHE = InitializeDiagonals();
         }
@@ -48,7 +56,7 @@ namespace PhantomGo.Core.Logic
 
         public PointState GetPointState(Point point)
         {
-            return _board[point.X, point.Y];
+            return _board[point.Row, point.Col];
         }
 
         public PlayResult PlaceStone(Point point, Player player)
@@ -59,7 +67,7 @@ namespace PhantomGo.Core.Logic
             }
 
             var stoneColor = PlayerToPointState(player);
-            _board[point.X, point.Y] = stoneColor;
+            _board[point.Row, point.Col] = stoneColor;
 
             // 提子逻辑
             var capturedStones = new List<Point>();
@@ -79,19 +87,19 @@ namespace PhantomGo.Core.Logic
             var (ownGroup, ownLiberties) = FindGroup(point);
             if (capturedStones.Count == 0 && ownLiberties == 0)
             {
-                _board[point.X, point.Y] = PointState.None;
+                _board[point.Row, point.Col] = PointState.None;
                 return PlayResult.Failure("自杀点，禁止落子");
             }
 
             ulong nextHash = _currentHash;
-            nextHash ^= _zobrist.GetHash(point.X, point.Y, (int)stoneColor);
+            nextHash ^= _zobrist.GetHash(point.Row, point.Col, (int)stoneColor);
             foreach(var captured in capturedStones.Distinct())
             {
-                nextHash ^= _zobrist.GetHash(captured.X, captured.Y, (int)opponent);
+                nextHash ^= _zobrist.GetHash(captured.Row, captured.Col, (int)opponent);
             }
             if (_historyHashes.Contains(nextHash))
             {
-                _board[point.X, point.Y] = PointState.None;
+                _board[point.Row, point.Col] = PointState.None;
                 return PlayResult.Failure("全局同形，禁止落子");
             }
 
@@ -113,6 +121,9 @@ namespace PhantomGo.Core.Logic
                 }
             }
 
+            // 记录当前棋盘状态到历史
+            RecordBoardHistory();
+
             return PlayResult.Success(capturedStones.Distinct().ToList(), String.Empty);
         }
         public UndoInfo? PlaceStoneForSimulation(Point point, Player player)
@@ -126,7 +137,7 @@ namespace PhantomGo.Core.Logic
             var previousKoPoint = _koPoint;
 
             var stoneColor = PlayerToPointState(player);
-            _board[point.X, point.Y] = stoneColor;
+            _board[point.Row, point.Col] = stoneColor;
 
             // 提子逻辑
             var capturedStones = new List<Point>();
@@ -146,19 +157,19 @@ namespace PhantomGo.Core.Logic
             var (ownGroup, ownLiberties) = FindGroup(point);
             if (capturedStones.Count == 0 && ownLiberties == 0)
             {
-                _board[point.X, point.Y] = PointState.None;
+                _board[point.Row, point.Col] = PointState.None;
                 return null;
             }
 
             ulong nextHash = _currentHash;
-            nextHash ^= _zobrist.GetHash(point.X, point.Y, (int)stoneColor);
+            nextHash ^= _zobrist.GetHash(point.Row, point.Col, (int)stoneColor);
             foreach (var captured in capturedStones.Distinct())
             {
-                nextHash ^= _zobrist.GetHash(captured.X, captured.Y, (int)opponent);
+                nextHash ^= _zobrist.GetHash(captured.Row, captured.Col, (int)opponent);
             }
             if (_historyHashes.Contains(nextHash))
             {
-                _board[point.X, point.Y] = PointState.None;
+                _board[point.Row, point.Col] = PointState.None;
                 return null;
             }
 
@@ -180,21 +191,30 @@ namespace PhantomGo.Core.Logic
                 }
             }
 
+            // 记录当前棋盘状态到历史
+            RecordBoardHistory();
+
             return new UndoInfo(point, previousKoPoint, capturedStones.Distinct().ToList(), previousHash);
         }
         public void UndoMove(UndoInfo undoInfo, Player player)
         {
-            _board[undoInfo.Point.X, undoInfo.Point.Y] = PointState.None;
+            _board[undoInfo.Point.Row, undoInfo.Point.Col] = PointState.None;
 
             var opponent = PlayerToPointState(player.GetOpponent());
             foreach(var point in undoInfo.CapturedPoints)
             {
-                _board[point.X, point.Y] = opponent;
+                _board[point.Row, point.Col] = opponent;
             }
 
             _historyHashes.Remove(_currentHash);
             _currentHash = undoInfo.PreviousHash;
             _koPoint = undoInfo.PreviousKoPoint;
+
+            // 撤销历史记录（移除最后一条）
+            if (_boardHistory.Count > 1) // 至少保留一个初始状态
+            {
+                _boardHistory.RemoveAt(_boardHistory.Count - 1);
+            }
         }
 
         #region 辅助方法
@@ -249,6 +269,11 @@ namespace PhantomGo.Core.Logic
             {
                 newBoard._historyHashes.Add(hash);
             }
+            // 克隆历史记录
+            foreach (var historyBoard in this._boardHistory)
+            {
+                newBoard._boardHistory.Add(CloneBoardState(historyBoard));
+            }
             return newBoard;
         }
 
@@ -262,25 +287,33 @@ namespace PhantomGo.Core.Logic
             {
                 newBoard._historyHashes.Add(hash);
             }
+            // 克隆历史记录
+            foreach (var historyBoard in this._boardHistory)
+            {
+                newBoard._boardHistory.Add(CloneBoardState(historyBoard));
+            }
             return newBoard;
         }
         private bool IsOnBoard(Point point)
         {
-            return point.X <= Size && point.X > 0 &&
-                   point.Y <= Size && point.Y > 0;
+            return point.Row <= Size && point.Row > 0 &&
+                   point.Col <= Size && point.Col > 0;
         }
         public void SetState(Point point, Player color)
         {
-            if (color == Player.Black) _board[point.X, point.Y] = PointState.black;
-            else _board[point.X, point.Y] = PointState.white;
+            if (color == Player.Black) _board[point.Row, point.Col] = PointState.black;
+            else _board[point.Row, point.Col] = PointState.white;
         }
-
-        public List<Point> GetNeighbors(Point point)
+        public void ClearState(Point point)
+        {
+            _board[point.Row, point.Col] = PointState.None;
+        }
+        public static List<Point> GetNeighbors(Point point)
         {
             return NEIGHBORS_CACHE[point];
         }
 
-        public List<Point> GetDiagonals(Point point)
+        public static List<Point> GetDiagonals(Point point)
         {
             return DIAGONALS_CACHE[point];
         }
@@ -335,19 +368,19 @@ namespace PhantomGo.Core.Logic
                 if (updateHash)
                 {
                     // 撤销哈希就是把对应的key再异或一次
-                    _currentHash ^= _zobrist.GetHash(point.X, point.Y, (int)_board[point.X, point.Y]);
+                    _currentHash ^= _zobrist.GetHash(point.Row, point.Col, (int)_board[point.Row, point.Col]);
                 }
-                _board[point.X, point.Y] = PointState.None;
+                _board[point.Row, point.Col] = PointState.None;
             }
         }
         public List<Point> GetEmptyPoints()
         {
             var points = new List<Point>();
-            for (int x = 1; x <= Size; ++x)
+            for (int row = 1; row <= Size; ++row)
             {
-                for (int y = 1; y <= Size; ++y)
+                for (int col = 1; col <= Size; ++col)
                 {
-                    var point = new Point(x, y);
+                    var point = new Point(row, col);
                     if (GetPointState(point) == PointState.None) points.Add(point);
                 }
             }
@@ -357,17 +390,17 @@ namespace PhantomGo.Core.Logic
         public Dictionary<Point, List<Point>> InitializeNeighbors()
         {
             var neighborsDic = new Dictionary<Point, List<Point>>();
-            for (int x = 1; x <= Size; ++x)
+            for (int row = 1; row <= Size; ++row)
             {
-                for (int y = 1; y <= Size; ++y)
+                for (int col = 1; col <= Size; ++col)
                 {
-                    var point = new Point(x, y);
+                    var point = new Point(row, col);
                     neighborsDic.Add(point, new List<Point>
                     {
-                        new Point(x - 1, y),
-                        new Point(x + 1, y),
-                        new Point(x, y - 1),
-                        new Point(x, y + 1)
+                        new Point(row - 1, col),
+                        new Point(row + 1, col),
+                        new Point(row, col - 1),
+                        new Point(row, col + 1)
                     }.Where(p => IsOnBoard(p)).ToList());
                 }
             }
@@ -376,17 +409,17 @@ namespace PhantomGo.Core.Logic
         public Dictionary<Point, List<Point>> InitializeDiagonals()
         {
             var digonalsDic = new Dictionary<Point, List<Point>>();
-            for (int x = 1; x <= Size; ++x)
+            for (int row = 1; row <= Size; ++row)
             {
-                for (int y = 1; y <= Size; ++y)
+                for (int col = 1; col <= Size; ++col)
                 {
-                    var point = new Point(x, y);
+                    var point = new Point(row, col);
                     digonalsDic.Add(point, new List<Point>
                     {
-                        new Point(x + 1, y + 1),
-                        new Point(x - 1, y - 1),
-                        new Point(x + 1, y - 1),
-                        new Point(x - 1, y + 1)
+                        new Point(row + 1, col + 1),
+                        new Point(row - 1, col - 1),
+                        new Point(row + 1, col - 1),
+                        new Point(row - 1, col + 1)
                     }.Where(p => IsOnBoard(p)).ToList());
                 }
             }
@@ -396,6 +429,56 @@ namespace PhantomGo.Core.Logic
         {
             return player == Player.Black ? PointState.black : PointState.white;
         }
+
+        /// <summary>
+        /// 记录当前棋盘状态到历史
+        /// </summary>
+        public void RecordBoardHistory()
+        {
+            _boardHistory.Add(CloneBoardState(_board));
+
+            // 只保留最近 MAX_HISTORY_LENGTH 步
+            if (_boardHistory.Count > MAX_HISTORY_LENGTH)
+            {
+                _boardHistory.RemoveAt(0);
+            }
+        }
+
+        /// <summary>
+        /// 克隆棋盘状态
+        /// </summary>
+        private PointState[,] CloneBoardState(PointState[,] board)
+        {
+            var cloned = new PointState[Size + 1, Size + 1];
+            Array.Copy(board, cloned, board.Length);
+            return cloned;
+        }
+
+        /// <summary>
+        /// 获取历史棋盘状态
+        /// </summary>
+        /// <param name="steps">需要的历史步数</param>
+        /// <returns>历史棋盘状态列表，从最新到最旧</returns>
+        public List<PointState[,]> GetBoardHistory(int steps)
+        {
+            var result = new List<PointState[,]>();
+            int count = Math.Min(steps, _boardHistory.Count);
+
+            // 从最新到最旧获取历史
+            for (int i = _boardHistory.Count - 1; i >= _boardHistory.Count - count; i--)
+            {
+                result.Add(_boardHistory[i]);
+            }
+
+            // 如果历史不足，用空棋盘填充
+            while (result.Count < steps)
+            {
+                result.Add(new PointState[Size + 1, Size + 1]);
+            }
+
+            return result;
+        }
+
         #endregion
 
         #region Zobrist Hash
@@ -431,6 +514,38 @@ namespace PhantomGo.Core.Logic
                 byte[] buffer = new byte[8];
                 _random.NextBytes(buffer);
                 return BitConverter.ToUInt64(buffer, 0);
+            }
+        }
+        #endregion
+        #region Debug
+        public void Print()
+        {
+            Debug.Print("[棋盘状态]");
+            // 外层循环 row（行），内层循环 col（列），按行打印
+            for (int row = 1; row <= Size; ++row)
+            {
+                for(int col = 1; col <= Size; ++col)
+                {
+                    var state = GetPointState(new Point(row, col));
+                    char color = state == PointState.black ? 'b' : (state == PointState.white ? 'w' : '*');
+                    Debug.Write(color + " ");
+                }
+                Debug.WriteLine("");
+            }
+        }
+        public void PrintOnConsole()
+        {
+            Console.WriteLine("[模拟的棋盘状态]");
+            // 外层循环 row（行），内层循环 col（列），按行打印
+            for (int row = 1; row <= Size; ++row)
+            {
+                for (int col = 1; col <= Size; ++col)
+                {
+                    var state = GetPointState(new Point(row, col));
+                    char color = state == PointState.black ? 'b' : (state == PointState.white ? 'w' : '*');
+                    Console.Write(color + " ");
+                }
+                Console.WriteLine("");
             }
         }
         #endregion

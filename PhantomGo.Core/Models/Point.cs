@@ -8,27 +8,29 @@ using System.Threading.Tasks;
 namespace PhantomGo.Core.Models
 {
     /// <summary>
-    /// 表示棋盘上一个二维坐标 (x,y)
+    /// 表示棋盘上一个二维坐标 (row, col)
+    /// 注意：构造函数参数顺序为 (行, 列)，与数组索引 [row, col] 一致
     /// </summary>
     public readonly struct Point : IEquatable<Point>
     {
         /// <summary>
-        /// x 轴坐标
+        /// 行坐标（垂直方向，1-9，显示时倒序为 9-1）
         /// </summary>
-        public int X { get; }
+        public int Row { get; }
         /// <summary>
-        /// y 轴坐标
+        /// 列坐标（水平方向，1-9 对应 A-I）
         /// </summary>
-        public int Y { get; }
-        public Point(int x, int y)
+        public int Col { get; }
+
+        public Point(int row, int col)
         {
-            X = x;
-            Y = y;
+            Row = row;
+            Col = col;
         }
 
         public bool Equals(Point other)
         {
-            return X == other.X && Y == other.Y;
+            return Row == other.Row && Col == other.Col;
         }
         public override bool Equals([NotNullWhen(true)] object? obj)
         {
@@ -37,7 +39,7 @@ namespace PhantomGo.Core.Models
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(X, Y);
+            return HashCode.Combine(Row, Col);
         }
 
         public static bool operator ==(Point left, Point right)
@@ -52,11 +54,12 @@ namespace PhantomGo.Core.Models
 
         public override string ToString()
         {
-            char symbol = (char)('A' + X - 1);
-            return $"{symbol}{10 - Y}";
+            char symbol = (char)('A' + Col - 1);
+            return $"{symbol}{10 - Row}";
         }
         /// <summary>
-        /// 将棋局上的坐标 (A1) 转换为坐标点 (x, y)
+        /// 将棋局上的坐标 (A1) 转换为坐标点 (row, col)
+        /// 例如：A9 -> Point(1, 1)，I1 -> Point(9, 9)
         /// </summary>
         public static Point TransInputToPoint(string input)
         {
@@ -66,13 +69,18 @@ namespace PhantomGo.Core.Models
             }
             input = input.ToUpper();
             char symbol = input[0];
-            int x = symbol - 'A' + 1;
-            int y = int.Parse(input.Substring(1));
-            return new Point(x, y);
+            int col = symbol - 'A' + 1;
+            int row = 10 - int.Parse(input.Substring(1));
+            return new Point(row, col);
         }
         public bool isMove()
         {
             return !(this.Equals(new Point(0, 0)) || this.Equals(new Point(0, 1)) || this.Equals(new Point(0, 2)));
+        }
+        public bool IsPass()
+        {
+            return this.Row == 0 && this.Col == 0;
+
         }
         public static Point Pass()
         {

@@ -248,7 +248,6 @@ namespace PhantomGo.Services
             _isAiThinking = true;
             AiThinkingChanged?.Invoke(_isAiThinking);
 
-            var gameView = new PhantomGoView(_gameController, currentPlayer);
             await Task.Delay(200);
             var point = await Task.Run(() => currentAgent.GenerateMove().Item2);
 
