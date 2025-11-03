@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Read(//c/Users/舒一森/Desktop/博弈/Ghost-master/**)"
-    ],
-    "deny": [],
-    "ask": []
-  }
-}
